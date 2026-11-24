@@ -6,6 +6,10 @@
 
 Gõ giống UniKey trên Windows: **không gạch chân**, không "kẹt" chữ trên Chrome/Electron. ViKey bắt phím toàn hệ thống (CGEventTap). Khi một từ cần đổi dạng (`tieen` → `tiên`), nó nuốt phím vừa gõ, gửi backspace và gõ lại phần chữ khác biệt. Nếu chỉ là gõ thường, phím được cho đi thẳng tới app.
 
+<p align="center">
+  <img src="docs/screenshot.png" width="925" alt="Menu ViKey trên menu bar và cửa sổ Giới thiệu ViKey">
+</p>
+
 ## Cài đặt
 
 ### Tải bản build sẵn
@@ -72,8 +76,8 @@ Sources/ViKey/          app menu bar
   AboutWindow.swift     cửa sổ Giới thiệu
 Sources/ViKeySelfTest/  test engine (build.sh chạy trước khi build)
 Resources/              Info.plist, AppIcon.icns, logo + font brand
-scripts/                vẽ lại icon app (build-icon.sh → AppIcon.icns + docs/vikey-icon.png)
-docs/                   ảnh dùng trong README
+scripts/                vẽ lại icon app (build-icon.sh), đóng khung ảnh chụp màn hình (frame-screenshots.swift)
+docs/                   logo và ảnh chụp màn hình dùng trong README
 reference/              bản engine Python tương đương + cases.tsv dùng chung
 ```
 
