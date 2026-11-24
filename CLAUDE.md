@@ -35,6 +35,21 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
 - `bash build.sh` / `bash build.sh --install` — universal build, ad-hoc sign, copy to /Applications, reset + re-prompt
   Accessibility (ad-hoc signature changes every build, so the TCC grant must be re-enabled).
 
+## Repo and releases
+- Public repo: https://github.com/sunnysideprojects/vikey (org `sunnysideprojects` = Sunny Side Projects), branch
+  `main`, MIT (font OFL, SSP logo all rights reserved; see LICENSE). `origin` uses the SSH host alias
+  `github.com-personal` (personal key, account nhatnx); `gh` is logged in as nhatnx.
+- Never commit `ukmacro.txt` (the user's personal abbreviations, gitignored), `build/`, `dist/`.
+- Release steps (v1.0.0 done 2026-11-24):
+  1. Bump `CFBundleShortVersionString` / `CFBundleVersion` in `Resources/Info.plist`, commit, push.
+  2. `bash build.sh` (no `--install`), then `ditto -c -k --keepParent build/ViKey.app dist/ViKey-X.Y.Z.zip`.
+  3. `gh release create vX.Y.Z dist/ViKey-X.Y.Z.zip --target main --title "ViKey X.Y.Z" --notes-file …`. Notes in
+     Vietnamese: features/changes, install steps incl. the Gatekeeper workaround, SHA-256 of the zip, SSP endorsement
+     line at the end.
+- The app is ad-hoc signed, not notarized: first launch is blocked by Gatekeeper (right-click → Open, or
+  `xattr -dr com.apple.quarantine /Applications/ViKey.app`). Fixing that needs a paid Developer ID + notarization.
+- README links to `/releases/latest`, so it needs no edit per release.
+
 ## Engine rules worth knowing
 - Spell check on: a transform is applied only if the result stays a valid Vietnamese syllable prefix; if the word is
   invalid, output = raw keys minus "undo" keys (`tesst` → `test`, `windows` stays `windows`).
