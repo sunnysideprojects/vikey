@@ -74,7 +74,9 @@ def is_valid(letters, tone):
     if s.final:
         if s.final not in FINALS or not g:
             return False
-        if not any(compatible(g, n, True) for n in FINAL_NUCLEI):
+        # After "qu" the nucleus "uy" is left as a bare "y": quýt, Quỳnh.
+        qu_y = s.initial == "qu" and len(g) == 1 and g[0][0] == "y"
+        if not qu_y and not any(compatible(g, n, True) for n in FINAL_NUCLEI):
             return False
         if s.final in STOP_FINALS and tone in (2, 3, 4):
             return False
@@ -160,7 +162,8 @@ class Engine:
         mutate()
         if self._ok():
             return True
-        self.letters = [Letter(*t) for t in snap[0]]
+        # In place: callers' closures hold this list, a new one would hide the revert from them.
+        self.letters[:] = [Letter(*t) for t in snap[0]]
         self.tone = snap[1]
         return False
 
@@ -214,6 +217,10 @@ class Engine:
             if allow_insert and not any(l.base in VOWELS for l in L):
                 return self._try(lambda: L.append(Letter("u", HORN, ch.isupper())))
             return False
+        # "giw" -> "giư": the i of "gi" belongs to the initial, so w still inserts ư (giữ, giờ).
+        if allow_insert and len(L) == 2 and L[0].base == "g" and L[1].base == "i" and L[1].mod == NONE:
+            if self._try(lambda: L.append(Letter("u", HORN, ch.isupper()))):
+                return True
         bases = [L[k].base for k in g]
         targets = []
         if allow_horn:

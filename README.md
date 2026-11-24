@@ -81,7 +81,7 @@ docs/                   logo và ảnh chụp màn hình dùng trong README
 reference/              bản engine Python tương đương + cases.tsv dùng chung
 ```
 
-Thêm test: bổ sung dòng vào `reference/cases.tsv`, chạy `python3 reference/test_engine.py`, rồi copy case sang `Sources/ViKeySelfTest/main.swift`.
+Thêm test: bổ sung dòng vào `reference/cases.tsv`, chạy `python3 reference/test_engine.py`, rồi `swift run -c release ViKeySelfTest` (test Swift đọc cùng file này).
 
 ## Giới hạn
 

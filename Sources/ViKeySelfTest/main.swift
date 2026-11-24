@@ -1,96 +1,17 @@
 import Foundation
 import ViKeyCore
 
-// Generated from proto/cases.tsv — same cases as the Python reference engine.
-let cases: [(String, Bool, String, String)] = [
-    ("telex", false, "tieengs", "tiếng"),
-    ("telex", false, "tiengse", "tiếng"),
-    ("telex", false, "vieetj", "việt"),
-    ("telex", false, "Vieetj", "Việt"),
-    ("telex", false, "VIEETJ", "VIỆT"),
-    ("telex", false, "dduowngf", "đường"),
-    ("telex", false, "DDUWOWNGF", "ĐƯỜNG"),
-    ("telex", false, "truowngf", "trường"),
-    ("telex", false, "nguoiwf", "người"),
-    ("telex", false, "nguwowif", "người"),
-    ("telex", false, "duowcj", "dược"),
-    ("telex", false, "dduwowcj", "được"),
-    ("telex", false, "hoaf", "hòa"),
-    ("telex", true, "hoaf", "hoà"),
-    ("telex", false, "hoangf", "hoàng"),
-    ("telex", false, "thuyr", "thủy"),
-    ("telex", true, "thuyr", "thuỷ"),
-    ("telex", false, "cuar", "của"),
-    ("telex", false, "quar", "quả"),
-    ("telex", false, "quys", "quý"),
-    ("telex", false, "gif", "gì"),
-    ("telex", false, "giaf", "già"),
-    ("telex", false, "giuwx", "giữ"),
-    ("telex", false, "muwa", "mưa"),
-    ("telex", false, "mwa", "mưa"),
-    ("telex", false, "w", "ư"),
-    ("telex", false, "nhw", "như"),
-    ("telex", false, "tuaans", "tuấn"),
-    ("telex", false, "khuyeenx", "khuyễn"),
-    ("telex", false, "khuyar", "khuỷa"),
-    ("telex", false, "oais", "oái"),
-    ("telex", false, "ngoeos", "ngoéo"),
-    ("telex", false, "thuowr", "thuở"),
-    ("telex", false, "aaa", "aa"),
-    ("telex", false, "ass", "as"),
-    ("telex", false, "ddd", "dd"),
-    ("telex", false, "tesst", "test"),
-    ("telex", false, "windows", "windows"),
-    ("telex", false, "class", "class"),
-    ("telex", false, "google", "google"),
-    ("telex", false, "facebook", "facebook"),
-    ("telex", false, "teams", "teams"),
-    ("telex", false, "data", "dât"),
-    ("telex", false, "matf", "matf"),
-    ("telex", false, "mats", "mát"),
-    ("telex", false, "matj", "mạt"),
-    ("telex", false, "tooi", "tôi"),
-    ("telex", false, "ddaay", "đây"),
-    ("telex", false, "laf", "là"),
-    ("telex", false, "vaanx", "vẫn"),
-    ("telex", false, "chuyeenj", "chuyện"),
-    ("telex", false, "ngheef", "nghề"),
-    ("telex", false, "xooong", "xoong"),
-    ("telex", false, "asz", "a"),
-    ("telex", false, "tafi", "tài"),
-    ("telex", false, "tais", "tái"),
-    ("telex", false, "hoas", "hóa"),
-    ("telex", false, "baws", "bắ"),
-    ("telex", false, "awn", "ăn"),
-    ("telex", false, "thuwowng", "thương"),
-    ("telex", false, "yeeu", "yêu"),
-    ("telex", false, "nuwowcs", "nước"),
-    ("telex", false, "uw", "ư"),
-    ("telex", false, "ww", "w"),
-    ("telex", false, "nhaatj", "nhật"),
-    ("vni", false, "tie6ng1", "tiếng"),
-    ("vni", false, "vie6t5", "việt"),
-    ("vni", false, "d9u7o7ng2", "đường"),
-    ("vni", false, "duong7", "dương"),
-    ("vni", false, "nguoi72", "người"),
-    ("vni", false, "hoa2", "hòa"),
-    ("vni", true, "hoa2", "hoà"),
-    ("vni", false, "a8n", "ăn"),
-    ("vni", false, "a66", "a6"),
-    ("vni", false, "a11", "a1"),
-    ("vni", false, "mu7a", "mưa"),
-    ("vni", false, "thuy3", "thủy"),
-    ("vni", false, "d99", "d9"),
-    ("telex", false, "huow", "huơ"),
-    ("telex", false, "uwoww", "uwow"),
-    ("telex", false, "hello", "hello"),
-    ("telex", false, "you", "you"),
-    ("telex", false, "word", "word"),
-    ("telex", false, "new", "new"),
-    ("telex", false, "the", "the"),
-    ("vni", false, "u7o7", "uơ"),
-    ("vni", false, "u7o7ng", "ương"),
-]
+// Shared with the Python reference engine: reference/cases.tsv (method, modern 0/1, keys, expected).
+let casesFile = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    .appendingPathComponent("../../reference/cases.tsv").standardized
+guard let casesText = try? String(contentsOf: casesFile, encoding: .utf8) else {
+    print("ViKey self-test: cannot read \(casesFile.path)")
+    exit(1)
+}
+let cases: [(String, Bool, String, String)] = casesText.split(separator: "\n").compactMap { line in
+    let f = line.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+    return f.count == 4 ? (f[0], f[1] == "1", f[2], f[3]) : nil
+}
 
 var failures = 0
 

@@ -25,7 +25,8 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   build.sh. Brand source: ~/Documents/Workplace/SSP/brand (BRAND-BOOK.md, tokens/tokens.json).
 - `scripts/` — `build-icon.sh` + `make-icon.swift` (app icon), `frame-screenshots.swift` (README screenshot).
 - `docs/` — README images only: `vikey-icon.png` (logo), `screenshot.png` (menu + About window).
-- `Sources/ViKeySelfTest/` — engine tests as an executable (no XCTest, works with Command Line Tools only).
+- `Sources/ViKeySelfTest/` — engine tests as an executable (no XCTest, works with Command Line Tools only); reads
+  the engine cases from `reference/cases.tsv` at run time.
 - `reference/` — Python port of the engine (`engine.py`) + shared `cases.tsv` + `test_engine.py` (incl. 20k-word
   backspace fuzz). The Swift engine mirrors it 1:1; keep them in sync when changing rules.
 

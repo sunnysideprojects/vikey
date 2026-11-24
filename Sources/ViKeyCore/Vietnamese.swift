@@ -107,7 +107,9 @@ extension Vietnamese {
         let g: [NucleusChar] = s.group.map { (letters[$0].base, letters[$0].mod) }
         if !s.coda.isEmpty {
             guard finals.contains(s.coda), !g.isEmpty else { return false }
-            guard finalNuclei.contains(where: { compatible(g, $0, full: true) }) else { return false }
+            // After "qu" the nucleus "uy" is left as a bare "y": quýt, Quỳnh.
+            let quY = s.initial == "qu" && g.count == 1 && g[0].base == "y"
+            guard quY || finalNuclei.contains(where: { compatible(g, $0, full: true) }) else { return false }
             if stopFinals.contains(s.coda) && (2...4).contains(tone) { return false }
         } else if !g.isEmpty && !nuclei.contains(where: { compatible(g, $0, full: false) }) {
             return false

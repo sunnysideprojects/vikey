@@ -202,6 +202,11 @@ public final class Engine {
             }
             return false
         }
+        // "giw" -> "giư": the i of "gi" belongs to the initial, so w still inserts ư (giữ, giờ).
+        if allowInsert, letters.count == 2, letters[0].base == "g", letters[1].base == "i", letters[1].mod == .none {
+            let up = Self.isUpper(ch)
+            if attempt({ letters.append(Letter(base: "u", mod: .horn, upper: up)) }) { return true }
+        }
         let bases = g.map { letters[$0].base }
         var targets: [[Int]] = []
         if allowHorn {
