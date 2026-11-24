@@ -18,7 +18,9 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   UTF-16, `;` comment lines, `key:value`). Swift only, not in the Python reference.
 - `Sources/ViKey/` — `KeyTap.swift` (event tap + output), `AppDelegate.swift` (menu, Accessibility, per-app state),
   `Settings.swift` (UserDefaults), `MacroFile.swift` (polls the chosen ukmacro.txt every 3 s off the main thread,
-  read-only, so it can sit in Google Drive and be shared with UniKey on Windows), `AboutWindow.swift` ("Giới thiệu
+  read-only, so it can sit in Google Drive and be shared with UniKey on Windows), `SecureInput.swift` (polls
+  `IsSecureEventInputEnabled` every 1 s; holder app from the session's `kCGSSessionSecureInputPID`, which names
+  the responsible GUI app; menu bar shows a lock + greyed letter and a menu line), `AboutWindow.swift` ("Giới thiệu
   ViKey", Sunny Side Projects brand: tokens, Bricolage Grotesque, endorsement line; `--about` launch arg opens it),
   `ViKeyApp.swift` (@main).
 - `Resources/` — Info.plist, `AppIcon.icns`, the SSP logo and Bricolage font (OFL), copied into Contents/Resources by
@@ -78,6 +80,8 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
 
 ## Status / open issues
 - Claude can build, install and launch on the user's Mac (Xcode + gh available); the user tests typing by hand.
+- On this macOS the status item has no window owned by ViKey in `CGWindowListCopyWindowInfo`; to check the menu bar
+  icon, capture the screen strip instead (`screencapture -x -R<x>,0,900,30`).
 - Shipped 2026-11-24: app icon, About window, gõ tắt, public repo, release v1.0.0, README logo + screenshot.
 - Fixed (user confirmed 2026-11-16): fast typing dropped text ("làm" → "lm"; after deleting and retyping → "a2a2" /
   "la2m"). User types VNI. Cause: synthetic text events used keycode 0 (= the A key, often still held when typing
@@ -88,7 +92,7 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   (a) returning the modified original event for the last char instead of swallowing it, (b) a per-app slow mode with
   small delays between synthetic events, (c) skipping the browser-fix U+202F trick outside address bars.
 - Abbreviations (gõ tắt) with the user's ukmacro.txt on Google Drive: user confirmed working 2026-11-24.
-- Known limits: no Secure Input (password fields), no restoring an old word after the caret moved, Unicode only.
+- Known limits: no typing under Secure Input (password fields; shown with a lock in the menu bar), no restoring an old word after the caret moved, Unicode only.
 
 ## Conventions
 - Code and comments in English; user-facing menu strings in Vietnamese.

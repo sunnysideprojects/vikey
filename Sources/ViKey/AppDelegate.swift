@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var keyTap: KeyTap!
     private var permissionTimer: Timer?
     private let macroFile = MacroFile()
+    private let secureInput = SecureInputMonitor()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         engine = Engine(method: settings.method, modernTone: settings.modernTone, spellCheck: settings.spellCheck)
@@ -32,6 +33,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(appActivated(_:)),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
+
+        secureInput.onChange = { [weak self] in
+            // Keys typed while Secure Input was on never reached the tap: the word state is stale.
+            self?.keyTap.resetWord()
+            self?.refreshUI()
+        }
+        secureInput.start()
 
         startWhenTrusted()
         macroFile.watch(settings.macroPath.map { URL(fileURLWithPath: $0) })
@@ -103,16 +111,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func refreshUI() {
         if let button = statusItem.button {
             let on = settings.enabled
+            let locked = secureInput.isOn
             button.attributedTitle = NSAttributedString(
                 string: on ? "V" : "E",
                 attributes: [
                     .font: NSFont.systemFont(ofSize: 14, weight: .bold),
-                    .foregroundColor: on ? NSColor.systemRed : NSColor.labelColor,
+                    // Greyed while Secure Input blocks the tap: ViKey sees no keys.
+                    .foregroundColor: locked ? NSColor.secondaryLabelColor : on ? NSColor.systemRed : NSColor.labelColor,
                 ])
-            button.toolTip = on ? "ViKey: Tiếng Việt (\(settings.method == .telex ? "Telex" : "VNI"))" : "ViKey: English"
+            button.image = locked ? Self.lockImage : nil
+            button.imagePosition = .imageLeading
+            if locked {
+                button.toolTip = "ViKey tạm dừng: \(secureInputHolder) đang bật Secure Input"
+            } else {
+                button.toolTip = on ? "ViKey: Tiếng Việt (\(settings.method == .telex ? "Telex" : "VNI"))" : "ViKey: English"
+            }
         }
         statusItem.menu = buildMenu()
     }
+
+    private static let lockImage: NSImage? = NSImage(systemSymbolName: "lock.fill", accessibilityDescription: "Secure Input")?
+        .withSymbolConfiguration(.init(pointSize: 10, weight: .bold))
+
+    private var secureInputHolder: String { secureInput.holder ?? "một ứng dụng" }
 
     private func item(_ title: String, _ action: Selector?, checked: Bool = false, tag: Int = 0) -> NSMenuItem {
         let i = NSMenuItem(title: title, action: action, keyEquivalent: "")
@@ -124,6 +145,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildMenu() -> NSMenu {
         let menu = NSMenu()
+        if secureInput.isOn {
+            let info = NSMenuItem(title: "🔒 Tạm dừng: \(secureInputHolder) đang bật Secure Input", action: nil, keyEquivalent: "")
+            info.toolTip = "Khi ô mật khẩu hoặc Secure Keyboard Entry (Terminal, iTerm) đang bật, macOS không cho "
+                + "bộ gõ nào nhận phím. ViKey tự chạy lại khi nó tắt."
+            menu.addItem(info)
+            menu.addItem(.separator())
+        }
         menu.addItem(item("Gõ tiếng Việt (\(settings.hotkey.symbol))", #selector(menuToggle), checked: settings.enabled))
         menu.addItem(.separator())
         menu.addItem(item("Telex", #selector(chooseTelex), checked: settings.method == .telex))

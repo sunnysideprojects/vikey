@@ -52,6 +52,7 @@ Sau đó:
 | Phím tắt `w` | `w` → ư, `uow`/`uwow` → ươ, `thuowr` → thuở |
 | Nhớ trạng thái theo app | ví dụ Terminal luôn E, Slack luôn V |
 | Sửa lỗi trình duyệt | thanh địa chỉ Chrome/Edge/Safari/Firefox/Arc/Dia/Brave/Zen/Opera/Vivaldi/Orion/DuckDuckGo/Comet/Cốc Cốc (cả bản beta/dev) không nuốt chữ vì autocomplete |
+| Báo Secure Input | khi ô mật khẩu hoặc Secure Keyboard Entry (Terminal, iTerm) chặn bộ gõ, biểu tượng hiện 🔒 và menu ghi app nào đang bật |
 | Gõ tắt | dùng chung file `ukmacro.txt` với UniKey (để trên Google Drive được), tự nạp lại khi file đổi |
 | Khởi động cùng macOS | qua `SMAppService` |
 
@@ -73,6 +74,7 @@ Sources/ViKey/          app menu bar
   AppDelegate.swift     menu, quyền Accessibility, nhớ trạng thái theo app
   Settings.swift        UserDefaults
   MacroFile.swift       theo dõi file ukmacro.txt (gõ tắt)
+  SecureInput.swift     phát hiện Secure Input để báo trên menu bar
   AboutWindow.swift     cửa sổ Giới thiệu
 Sources/ViKeySelfTest/  test engine (build.sh chạy trước khi build)
 Resources/              Info.plist, AppIcon.icns, logo + font brand
@@ -85,7 +87,7 @@ Thêm test: bổ sung dòng vào `reference/cases.tsv`, chạy `python3 referenc
 
 ## Giới hạn
 
-- Ô mật khẩu (Secure Input) macOS chặn mọi event tap, nên ViKey không hoạt động ở đó, giống mọi bộ gõ dạng này.
+- Ô mật khẩu (Secure Input) macOS chặn mọi event tap, nên ViKey không hoạt động ở đó, giống mọi bộ gõ dạng này. Khi đó biểu tượng trên menu bar hiện ổ khoá và chữ V chuyển xám.
 - Bấm backspace khi đang ở giữa từ cũ (sau khi click chuột hoặc di chuyển con trỏ) sẽ không khôi phục được từ đó để sửa dấu. UniKey cũng vậy.
 - Chỉ xuất Unicode dựng sẵn; không có TCVN3/VNI-Windows.
 
