@@ -51,7 +51,7 @@ Sau đó:
 | Gõ lại để huỷ dấu | `ass` → as, `aaa` → aa, `ddd` → dd, `ww` → w |
 | Phím tắt `w` | `w` → ư, `uow`/`uwow` → ươ, `thuowr` → thuở |
 | Nhớ trạng thái theo app | ví dụ Terminal luôn E, Slack luôn V |
-| Sửa lỗi trình duyệt | thanh địa chỉ Chrome/Edge/Arc/Brave/Firefox/Safari/Cốc Cốc không nuốt chữ vì autocomplete |
+| Sửa lỗi trình duyệt | thanh địa chỉ Chrome/Edge/Safari/Firefox/Arc/Dia/Brave/Zen/Opera/Vivaldi/Orion/DuckDuckGo/Comet/Cốc Cốc (cả bản beta/dev) không nuốt chữ vì autocomplete |
 | Gõ tắt | dùng chung file `ukmacro.txt` với UniKey (để trên Google Drive được), tự nạp lại khi file đổi |
 | Khởi động cùng macOS | qua `SMAppService` |
 

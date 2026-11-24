@@ -8,10 +8,17 @@ final class KeyTap {
     static let syntheticMarker: Int64 = 0x5649_4B45  // "VIKE"
 
     private static let browsers: Set<String> = [
-        "com.google.Chrome", "com.google.Chrome.canary", "com.google.Chrome.beta",
-        "com.microsoft.edgemac", "com.brave.Browser", "company.thebrowser.Browser",
-        "org.mozilla.firefox", "com.apple.Safari", "com.operasoftware.Opera",
-        "com.vivaldi.Vivaldi", "com.coccoc.Coccoc", "org.chromium.Chromium",
+        "com.google.Chrome", "com.google.Chrome.beta", "com.google.Chrome.dev", "com.google.Chrome.canary",
+        "org.chromium.Chromium",
+        "com.microsoft.edgemac", "com.microsoft.edgemac.Beta", "com.microsoft.edgemac.Dev",
+        "com.microsoft.edgemac.Canary",
+        "com.apple.Safari", "com.apple.SafariTechnologyPreview",
+        "org.mozilla.firefox", "org.mozilla.firefoxdeveloperedition", "org.mozilla.nightly",
+        "app.zen-browser.zen",
+        "com.brave.Browser", "company.thebrowser.Browser", "company.thebrowser.dia",
+        "com.operasoftware.Opera", "com.operasoftware.OperaGX", "com.vivaldi.Vivaldi",
+        "com.kagi.kagimacOS", "com.duckduckgo.macos.browser", "ai.perplexity.comet",
+        "com.coccoc.Coccoc",
     ]
 
     private static let backspaceKey: CGKeyCode = 51
