@@ -4,10 +4,24 @@ Gõ giống UniKey trên Windows: **không gạch chân**, không "kẹt" chữ 
 
 ## Cài đặt
 
+### Tải bản build sẵn
+
+**[⬇ Tải ViKey bản mới nhất](https://github.com/sunnysideprojects/vikey/releases/latest)** (file `ViKey-x.y.z.zip`, macOS 13+, Apple Silicon và Intel)
+
+1. Giải nén, kéo `ViKey.app` vào **Applications**.
+2. App chỉ được ký ad-hoc (chưa notarize) nên macOS chặn lần đầu mở. Chuột phải vào app → **Open**, hoặc chạy:
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/ViKey.app
+   ```
+
+### Hoặc tự build từ source
+
 ```bash
 xcode-select --install        # nếu chưa có Command Line Tools
 ./build.sh --install          # self-test → build universal → cài vào /Applications → mở app
 ```
+
+### Sau khi cài
 
 Lần đầu mở, macOS sẽ hỏi quyền **Accessibility** → bật ViKey trong System Settings → Privacy & Security → Accessibility. App tự chạy ngay khi có quyền, không cần mở lại.
 
