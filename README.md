@@ -55,6 +55,7 @@ Sau đó:
 | Báo Secure Input | khi ô mật khẩu hoặc Secure Keyboard Entry (Terminal, iTerm) chặn bộ gõ, biểu tượng hiện 🔒 và menu ghi app nào đang bật |
 | Gõ tắt | dùng chung file `ukmacro.txt` với UniKey (để trên Google Drive được), tự nạp lại khi file đổi |
 | Khởi động cùng macOS | qua `SMAppService` |
+| Kiểm tra cập nhật | menu **Kiểm tra cập nhật…**, và tự hỏi GitHub mỗi ngày một lần (tắt được bằng **Tự kiểm tra cập nhật**). Chỉ đọc số phiên bản mới nhất, không gửi dữ liệu gì, không tự tải hay cài |
 
 ### Telex
 `s` sắc · `f` huyền · `r` hỏi · `x` ngã · `j` nặng · `z` xoá dấu · `aa` â · `ee` ê · `oo` ô · `aw` ă · `ow` ơ · `uw`/`w` ư · `dd` đ
@@ -69,12 +70,14 @@ Sources/ViKeyCore/      engine thuần Swift, không phụ thuộc AppKit
   Vietnamese.swift      bảng nguyên âm/phụ âm, kiểm tra âm tiết hợp lệ, vị trí dấu, render
   Engine.swift          xử lý phím theo từ: dấu, mũ/móc, huỷ dấu, khôi phục, backspace
   Macro.swift           đọc bảng gõ tắt định dạng UniKey
+  Version.swift         so sánh số phiên bản (kiểm tra cập nhật)
 Sources/ViKey/          app menu bar
   KeyTap.swift          CGEventTap: bắt phím, diff output, gửi backspace + Unicode
   AppDelegate.swift     menu, quyền Accessibility, nhớ trạng thái theo app
   Settings.swift        UserDefaults
   MacroFile.swift       theo dõi file ukmacro.txt (gõ tắt)
   SecureInput.swift     phát hiện Secure Input để báo trên menu bar
+  UpdateChecker.swift   hỏi GitHub bản phát hành mới nhất
   AboutWindow.swift     cửa sổ Giới thiệu
 Sources/ViKeySelfTest/  test engine (build.sh chạy trước khi build)
 Resources/              Info.plist, AppIcon.icns, logo + font brand

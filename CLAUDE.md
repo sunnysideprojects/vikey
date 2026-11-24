@@ -14,13 +14,19 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
 ## Layout
 - `Sources/ViKeyCore/` — pure engine, no AppKit. `Vietnamese.swift` (syllable validity, tone placement, render),
   `Engine.swift` (per-word key processing, undo-by-repeat, English restore, backspace resync).
+- `Sources/ViKeyCore/Version.swift` — `AppVersion` (dotted numeric compare, `v` prefix, 1.2 == 1.2.0), used by the
+  update check; Swift only, covered by the self-test.
 - `Sources/ViKeyCore/Macro.swift` — abbreviation table ("gõ tắt") in UniKey `ukmacro.txt` format (UTF-8/BOM/CRLF or
   UTF-16, `;` comment lines, `key:value`). Swift only, not in the Python reference.
 - `Sources/ViKey/` — `KeyTap.swift` (event tap + output), `AppDelegate.swift` (menu, Accessibility, per-app state),
   `Settings.swift` (UserDefaults), `MacroFile.swift` (polls the chosen ukmacro.txt every 3 s off the main thread,
   read-only, so it can sit in Google Drive and be shared with UniKey on Windows), `SecureInput.swift` (polls
   `IsSecureEventInputEnabled` every 1 s; holder app from the session's `kCGSSessionSecureInputPID`, which names
-  the responsible GUI app; menu bar shows a lock + greyed letter and a menu line), `AboutWindow.swift` ("Giới thiệu
+  the responsible GUI app; menu bar shows a lock + greyed letter and a menu line), `UpdateChecker.swift` (GET
+  `api.github.com/repos/sunnysideprojects/vikey/releases/latest`, compares `tag_name` with CFBundleShortVersionString;
+  menu "Kiểm tra cập nhật…" shows an alert, auto check 20 s after launch then daily unless "Tự kiểm tra cập nhật"
+  is off, a newer release adds a top menu line that opens the release page; never downloads or installs; `--check-update`
+  launch arg runs the manual check), `AboutWindow.swift` ("Giới thiệu
   ViKey", Sunny Side Projects brand: tokens, Bricolage Grotesque, endorsement line; `--about` launch arg opens it),
   `ViKeyApp.swift` (@main).
 - `Resources/` — Info.plist, `AppIcon.icns`, the SSP logo and Bricolage font (OFL), copied into Contents/Resources by

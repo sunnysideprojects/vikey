@@ -11,6 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var permissionTimer: Timer?
     private let macroFile = MacroFile()
     private let secureInput = SecureInputMonitor()
+    private let updates = UpdateChecker(
+        currentVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         engine = Engine(method: settings.method, modernTone: settings.modernTone, spellCheck: settings.spellCheck)
@@ -45,6 +47,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         macroFile.watch(settings.macroPath.map { URL(fileURLWithPath: $0) })
         // `open -a ViKey --args --about`: open the About window at launch (for checking the layout).
         if CommandLine.arguments.contains("--about") { AboutWindow.show() }
+
+        updates.onChange = { [weak self] in self?.refreshUI() }
+        if settings.autoUpdateCheck { updates.startAutomatic() }
+        // `--check-update`: run the manual check at launch (for checking the dialog).
+        if CommandLine.arguments.contains("--check-update") { checkForUpdates() }
     }
 
     // MARK: - Accessibility
@@ -150,8 +157,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             info.toolTip = "Khi ô mật khẩu hoặc Secure Keyboard Entry (Terminal, iTerm) đang bật, macOS không cho "
                 + "bộ gõ nào nhận phím. ViKey tự chạy lại khi nó tắt."
             menu.addItem(info)
-            menu.addItem(.separator())
         }
+        if let release = updates.available {
+            menu.addItem(item("⬆️ Đã có ViKey \(release.version) — mở trang tải về…", #selector(openReleasePage)))
+        }
+        if secureInput.isOn || updates.available != nil { menu.addItem(.separator()) }
         menu.addItem(item("Gõ tiếng Việt (\(settings.hotkey.symbol))", #selector(menuToggle), checked: settings.enabled))
         menu.addItem(.separator())
         menu.addItem(item("Telex", #selector(chooseTelex), checked: settings.method == .telex))
@@ -172,11 +182,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(macroMenu())
 
         menu.addItem(item("Khởi động cùng macOS", #selector(toggleLogin), checked: SMAppService.mainApp.status == .enabled))
+        menu.addItem(item("Tự kiểm tra cập nhật", #selector(toggleAutoUpdate), checked: settings.autoUpdateCheck))
         menu.addItem(.separator())
         if !keyTap.isRunning {
             menu.addItem(item("⚠️ Cấp quyền Accessibility…", #selector(openAccessibilitySettings)))
             menu.addItem(.separator())
         }
+        menu.addItem(item("Kiểm tra cập nhật…", #selector(checkForUpdates)))
         menu.addItem(item("Giới thiệu ViKey", #selector(showAbout)))
         menu.addItem(item("Thoát ViKey", #selector(quit)))
         return menu
@@ -310,6 +322,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSAlert(error: error).runModal()
         }
         refreshUI()
+    }
+
+    // MARK: - Updates
+
+    @objc private func toggleAutoUpdate() {
+        settings.autoUpdateCheck.toggle()
+        if settings.autoUpdateCheck { updates.startAutomatic() } else { updates.stopAutomatic() }
+        refreshUI()
+    }
+
+    @objc private func openReleasePage() {
+        NSWorkspace.shared.open(updates.available?.page ?? UpdateChecker.releasesPage)
+    }
+
+    @objc private func checkForUpdates() {
+        updates.check { [weak self] outcome in
+            let alert = NSAlert()
+            switch outcome {
+            case .available(let release):
+                alert.messageText = "Đã có ViKey \(release.version)"
+                alert.informativeText = "Bạn đang dùng bản \(self?.updates.current?.description ?? "?"). "
+                    + "Tải file zip trên trang phát hành, giải nén rồi thay ViKey.app trong Applications. "
+                    + "Sau khi thay, bật lại quyền Accessibility cho ViKey."
+                alert.addButton(withTitle: "Mở trang tải về")
+                alert.addButton(withTitle: "Để sau")
+            case .upToDate(let current):
+                alert.messageText = "ViKey đã là bản mới nhất"
+                alert.informativeText = "Phiên bản \(current)."
+            case .failed(let reason):
+                alert.alertStyle = .warning
+                alert.messageText = "Không kiểm tra được cập nhật"
+                alert.informativeText = reason
+            }
+            NSApp.activate(ignoringOtherApps: true)
+            if alert.runModal() == .alertFirstButtonReturn, case .available(let release) = outcome {
+                NSWorkspace.shared.open(release.page)
+            }
+        }
     }
 
     @objc private func showAbout() { AboutWindow.show() }

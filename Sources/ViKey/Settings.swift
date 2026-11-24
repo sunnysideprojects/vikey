@@ -83,6 +83,11 @@ final class Settings {
         get { d.string(forKey: "macroPath") }
         set { d.set(newValue, forKey: "macroPath") }
     }
+    /// Ask GitHub once a day whether a newer release exists.
+    var autoUpdateCheck: Bool {
+        get { bool("autoUpdateCheck", true) }
+        set { d.set(newValue, forKey: "autoUpdateCheck") }
+    }
     var appStates: [String: Bool] {
         get { d.dictionary(forKey: "appStates") as? [String: Bool] ?? [:] }
         set { d.set(newValue, forKey: "appStates") }
