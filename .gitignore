@@ -1,0 +1,8 @@
+.build/
+build/
+.swiftpm/
+__pycache__/
+.DS_Store
+.claude/settings.local.json
+# Personal abbreviation table (pick your own file from the menu)
+ukmacro.txt
