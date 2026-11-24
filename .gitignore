@@ -6,3 +6,4 @@ __pycache__/
 .claude/settings.local.json
 # Personal abbreviation table (pick your own file from the menu)
 ukmacro.txt
+dist/
