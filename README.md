@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/vikey-icon.png" width="128" height="128" alt="ViKey">
+</p>
+
 # ViKey — bộ gõ tiếng Việt kiểu UniKey cho macOS
 
 Gõ giống UniKey trên Windows: **không gạch chân**, không "kẹt" chữ trên Chrome/Electron. ViKey bắt phím toàn hệ thống (CGEventTap). Khi một từ cần đổi dạng (`tieen` → `tiên`), nó nuốt phím vừa gõ, gửi backspace và gõ lại phần chữ khác biệt. Nếu chỉ là gõ thường, phím được cho đi thẳng tới app.
@@ -68,7 +72,8 @@ Sources/ViKey/          app menu bar
   AboutWindow.swift     cửa sổ Giới thiệu
 Sources/ViKeySelfTest/  test engine (build.sh chạy trước khi build)
 Resources/              Info.plist, AppIcon.icns, logo + font brand
-scripts/                vẽ lại icon app (build-icon.sh)
+scripts/                vẽ lại icon app (build-icon.sh → AppIcon.icns + docs/vikey-icon.png)
+docs/                   ảnh dùng trong README
 reference/              bản engine Python tương đương + cases.tsv dùng chung
 ```
 
