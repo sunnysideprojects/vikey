@@ -25,7 +25,8 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   `ViKeyApp.swift` (@main).
 - `Resources/` — Info.plist, `AppIcon.icns`, the SSP logo and Bricolage font (OFL), copied into Contents/Resources by
   build.sh. Brand source: ~/Documents/Workplace/SSP/brand (BRAND-BOOK.md, tokens/tokens.json).
-- `scripts/` — `build-icon.sh` + `make-icon.swift` (app icon), `frame-screenshots.swift` (README screenshot).
+- `scripts/` — `build-icon.sh` + `make-icon.swift` (app icon), `frame-screenshots.swift` (README screenshot),
+  `release.sh` (GitHub release, see below).
 - `docs/` — README images only: `vikey-icon.png` (logo), `screenshot.png` (menu + About window).
 - `Sources/ViKeySelfTest/` — engine tests as an executable (no XCTest, works with Command Line Tools only); reads
   the engine cases from `reference/cases.tsv` at run time.
@@ -56,12 +57,15 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   `main`, MIT (font OFL, SSP logo all rights reserved; see LICENSE). `origin` uses the SSH host alias
   `github.com-personal` (personal key, account nhatnx); `gh` is logged in as nhatnx.
 - Never commit `ukmacro.txt` (the user's personal abbreviations, gitignored), `build/`, `dist/`.
-- Release steps (v1.0.0 done 2026-11-24):
-  1. Bump `CFBundleShortVersionString` / `CFBundleVersion` in `Resources/Info.plist`, commit, push.
-  2. `bash build.sh` (no `--install`), then `ditto -c -k --keepParent build/ViKey.app dist/ViKey-X.Y.Z.zip`.
-  3. `gh release create vX.Y.Z dist/ViKey-X.Y.Z.zip --target main --title "ViKey X.Y.Z" --notes-file …`. Notes in
-     Vietnamese: features/changes, install steps incl. the Gatekeeper workaround, SHA-256 of the zip, SSP endorsement
-     line at the end.
+- Releases (latest v1.0.3, 2026-11-24): `scripts/release.sh X.Y.Z changes.md [--dry-run]`. changes.md is the
+  release-specific part of the notes in Vietnamese (one-line summary + `## Thay đổi` bullets); write it in the
+  scratchpad, not the repo. The script checks (on main, clean, in sync with origin, tag free, version newer), bumps
+  `CFBundleShortVersionString` and `CFBundleVersion` (+1), runs build.sh, zips to `dist/ViKey-X.Y.Z.zip`, writes
+  `dist/notes-X.Y.Z.md` (changes + install steps incl. the Gatekeeper workaround + SHA-256 + SSP endorsement line),
+  then commits "Bump version to X.Y.Z", pushes, runs `gh release create` on that commit and checks the tag and
+  `releases/latest`. Info.plist is restored on any failure before the commit. Do a `--dry-run` first (no git or
+  GitHub changes) and show the notes.
+- CI: `.github/workflows/ci.yml` on push to main / PRs (macos-latest): Python reference tests, build.sh, bundle checks.
 - The app is ad-hoc signed, not notarized: first launch is blocked by Gatekeeper (right-click → Open, or
   `xattr -dr com.apple.quarantine /Applications/ViKey.app`). Fixing that needs a paid Developer ID + notarization.
 - README links to `/releases/latest`, so it needs no edit per release.
