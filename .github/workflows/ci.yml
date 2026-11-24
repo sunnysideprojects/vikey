@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-build:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Toolchain
+        run: |
+          sw_vers
+          swift --version
+          python3 --version
+
+      - name: Reference engine tests (Python)
+        run: python3 reference/test_engine.py | tee python-tests.log && tail -1 python-tests.log | grep -qx 'fails 0'
+
+      # build.sh runs the Swift self-test (shared reference/cases.tsv + backspace fuzz), then the same
+      # universal build, app bundle and ad-hoc signature as a release.
+      - name: Swift self-test and universal app build
+        run: bash build.sh
+
+      - name: Check the app bundle
+        run: |
+          lipo build/ViKey.app/Contents/MacOS/ViKey -verify_arch arm64 x86_64
+          codesign --verify --strict build/ViKey.app
+          plutil -lint build/ViKey.app/Contents/Info.plist
