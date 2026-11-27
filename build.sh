@@ -19,15 +19,33 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/ViKey"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns Resources/ssp-app-icon.png Resources/BricolageGrotesque-Variable.ttf Resources/OFL-BricolageGrotesque.txt "$APP/Contents/Resources/"
-codesign --force --sign - "$APP"
-echo "✓ $APP"
+# Sign with ViKey's own certificate (scripts/make-signing-cert.sh) so the Accessibility grant survives
+# rebuilds and updates. Without it (CI, other Macs) fall back to ad-hoc, which changes every build.
+# VIKEY_SIGN_IDENTITY overrides the identity (its SHA-1; "-" forces ad-hoc).
+IDENTITY="${VIKEY_SIGN_IDENTITY:-$(security find-identity -p codesigning 2>/dev/null | grep -F '"ViKey Code Signing"' | awk '{ print $2; exit }' || true)}"
+codesign --force --sign "${IDENTITY:--}" "$APP"
+if [[ "${IDENTITY:--}" == "-" ]]; then
+  echo "✓ $APP (ad-hoc signature: Accessibility must be granted again after every build)"
+else
+  echo "✓ $APP (signed with $IDENTITY)"
+fi
 
 if [[ "${1:-}" == "--install" ]]; then
+  requirement() { codesign -d -r - "$1" 2>/dev/null | sed -n 's/^designated => //p'; }
+  OLD_REQ="$(requirement /Applications/ViKey.app || true)"
+  NEW_REQ="$(requirement "$APP")"
   pkill -x ViKey 2>/dev/null || true
   rm -rf /Applications/ViKey.app
   cp -R "$APP" /Applications/
-  # Ad-hoc signature changes on every build, so an old Accessibility grant no longer matches.
-  tccutil reset Accessibility dev.sunnysideprojects.vikey >/dev/null 2>&1 || true
-  open /Applications/ViKey.app
-  echo "✓ Đã cài vào /Applications và mở ViKey — cấp quyền Accessibility khi được hỏi."
+  # The Accessibility grant is tied to the designated requirement. Same certificate -> it still
+  # matches; ad-hoc (a new cdhash every build) or a different certificate -> stale, so reset it
+  # and let macOS ask again.
+  if [[ -n "$OLD_REQ" && "$OLD_REQ" == "$NEW_REQ" && "$NEW_REQ" != *cdhash* ]]; then
+    open /Applications/ViKey.app
+    echo "✓ Đã cài vào /Applications và mở ViKey (cùng chữ ký, giữ quyền Accessibility)."
+  else
+    tccutil reset Accessibility dev.sunnysideprojects.vikey >/dev/null 2>&1 || true
+    open /Applications/ViKey.app
+    echo "✓ Đã cài vào /Applications và mở ViKey — chữ ký đã đổi, cấp lại quyền Accessibility khi được hỏi."
+  fi
 fi

@@ -17,7 +17,7 @@ Gõ giống UniKey trên Windows: **không gạch chân**, không "kẹt" chữ 
 **[⬇ Tải ViKey bản mới nhất](https://github.com/sunnysideprojects/vikey/releases/latest)** (file `ViKey-x.y.z.zip`, macOS 13+, Apple Silicon và Intel)
 
 1. Giải nén, kéo `ViKey.app` vào **Applications**.
-2. App chỉ được ký ad-hoc (chưa notarize) nên macOS chặn lần đầu mở. Chuột phải vào app → **Open**, hoặc chạy:
+2. App được ký bằng chứng chỉ riêng của ViKey nhưng chưa notarize nên macOS chặn lần đầu mở. Chuột phải vào app → **Open**, hoặc chạy:
    ```bash
    xattr -dr com.apple.quarantine /Applications/ViKey.app
    ```
@@ -31,13 +31,13 @@ xcode-select --install        # nếu chưa có Command Line Tools
 
 ### Sau khi cài
 
-Lần đầu mở, macOS sẽ hỏi quyền **Accessibility** → bật ViKey trong System Settings → Privacy & Security → Accessibility. App tự chạy ngay khi có quyền, không cần mở lại.
+Lần đầu mở, macOS sẽ hỏi quyền **Accessibility** → bật ViKey trong System Settings → Privacy & Security → Accessibility. App tự chạy ngay khi có quyền, không cần mở lại. Các bản cập nhật sau giữ nguyên quyền này; riêng khi nâng cấp từ bản 1.0.9 trở về trước (ký ad-hoc) thì cần xoá ViKey khỏi danh sách rồi bật lại một lần.
 
 Sau đó:
 - Gỡ bộ gõ "Vietnamese" của macOS trong System Settings → Keyboard → Input Sources, chỉ giữ **ABC**.
 - Biểu tượng trên menu bar: **V** đỏ = tiếng Việt, **E** = tiếng Anh.
 
-> Mỗi lần build lại, chữ ký ad-hoc thay đổi nên quyền Accessibility cũ không còn khớp. `--install` đã tự reset quyền, bạn chỉ cần bật lại.
+> Tự build thì app được ký ad-hoc, chữ ký đổi sau mỗi lần build nên quyền Accessibility cũ không còn khớp; `--install` tự reset quyền, bạn chỉ cần bật lại. Muốn giữ quyền qua các lần build, tạo một chứng chỉ ký riêng một lần bằng `bash scripts/make-signing-cert.sh`.
 
 ## Tính năng
 
@@ -83,7 +83,8 @@ Sources/ViKey/          app menu bar
   AboutWindow.swift     cửa sổ Giới thiệu
 Sources/ViKeySelfTest/  test engine (build.sh chạy trước khi build)
 Resources/              Info.plist, AppIcon.icns, logo + font brand
-scripts/                vẽ lại icon app (build-icon.sh), đóng khung ảnh chụp màn hình (frame-screenshots.swift)
+scripts/                vẽ lại icon app (build-icon.sh), đóng khung ảnh chụp màn hình (frame-screenshots.swift),
+                        tạo chứng chỉ ký (make-signing-cert.sh), phát hành (release.sh)
 docs/                   logo và ảnh chụp màn hình dùng trong README
 reference/              bản engine Python tương đương + cases.tsv dùng chung
 ```

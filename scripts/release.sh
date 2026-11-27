@@ -27,6 +27,9 @@ PLIST=Resources/Info.plist
 ZIP="dist/ViKey-$VERSION.zip"
 NOTES="dist/notes-$VERSION.md"
 pb() { /usr/libexec/PlistBuddy -c "$1" "$PLIST"; }
+# Releases must be signed with ViKey's own certificate (scripts/make-signing-cert.sh), so users keep
+# their Accessibility grant across updates. Changing this pin means every user re-grants once.
+SIGNING_CERT_SHA1=19FE439139B32B434C22768BA5D6DBF00870F8D4
 
 # MARK: Checks
 echo "▸ Checks"
@@ -38,6 +41,8 @@ git fetch -q origin main --tags
 [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]] || die "main is not in sync with origin/main (pull or push first)"
 git rev-parse -q --verify "refs/tags/$TAG" >/dev/null && die "tag $TAG already exists"
 $DRY_RUN || ! gh release view "$TAG" >/dev/null 2>&1 || die "GitHub release $TAG already exists"
+security find-identity -p codesigning | grep -q "$SIGNING_CERT_SHA1" \
+  || die "signing certificate $SIGNING_CERT_SHA1 is not in the keychain (restore the .p12 backup)"
 
 CURRENT="$(pb 'Print :CFBundleShortVersionString')"
 BUILD="$(pb 'Print :CFBundleVersion')"
@@ -55,11 +60,14 @@ pb "Set :CFBundleShortVersionString $VERSION"
 pb "Set :CFBundleVersion $NEW_BUILD"
 
 echo "▸ Build"
-bash build.sh
+VIKEY_SIGN_IDENTITY="$SIGNING_CERT_SHA1" bash build.sh
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' build/ViKey.app/Contents/Info.plist)" == "$VERSION" ]] \
   || die "built app does not report version $VERSION"
 lipo build/ViKey.app/Contents/MacOS/ViKey -verify_arch arm64 x86_64
 codesign --verify --strict build/ViKey.app
+LEAF="$(echo "$SIGNING_CERT_SHA1" | tr 'A-F' 'a-f')"
+codesign -d -r - build/ViKey.app 2>/dev/null | grep -Eq "certificate (root|leaf) = H\"$LEAF\"" \
+  || die "built app is not signed with certificate $SIGNING_CERT_SHA1"
 
 echo "▸ Zip"
 mkdir -p dist
@@ -75,11 +83,11 @@ echo "  $ZIP  $SHA"
   cat <<EOF
 ## Cài đặt
 1. Tải \`ViKey-$VERSION.zip\`, giải nén, kéo \`ViKey.app\` vào **Applications** (thay bản cũ nếu có).
-2. App chỉ được ký ad-hoc (chưa notarize) nên macOS sẽ chặn lần đầu. Mở bằng cách chuột phải → **Open**, hoặc chạy:
+2. App được ký bằng chứng chỉ riêng của ViKey nhưng chưa notarize nên macOS sẽ chặn lần đầu. Mở bằng cách chuột phải → **Open**, hoặc chạy:
    \`\`\`bash
    xattr -dr com.apple.quarantine /Applications/ViKey.app
    \`\`\`
-3. Cấp quyền **Accessibility** khi được hỏi (System Settings → Privacy & Security → Accessibility). Nếu nâng cấp từ bản cũ, chữ ký app đã đổi nên cần xoá ViKey khỏi danh sách Accessibility rồi bật lại.
+3. Cấp quyền **Accessibility** khi được hỏi (System Settings → Privacy & Security → Accessibility). Nếu nâng cấp từ bản 1.0.9 trở về trước (ký ad-hoc) thì cần xoá ViKey khỏi danh sách Accessibility rồi bật lại một lần; các bản cập nhật sau giữ nguyên quyền.
 4. Gỡ bộ gõ "Vietnamese" của macOS, chỉ giữ **ABC**.
 
 Universal: Apple Silicon và Intel.

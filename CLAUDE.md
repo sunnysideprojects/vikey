@@ -45,7 +45,7 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
 - `Resources/` — Info.plist, `AppIcon.icns`, the SSP logo and Bricolage font (OFL), copied into Contents/Resources by
   build.sh. Brand source: ~/Documents/Workplace/SSP/brand (BRAND-BOOK.md, tokens/tokens.json).
 - `scripts/` — `build-icon.sh` + `make-icon.swift` (app icon), `frame-screenshots.swift` (README screenshot),
-  `release.sh` (GitHub release, see below).
+  `make-signing-cert.sh` (one-time signing certificate, see Repo and releases), `release.sh` (GitHub release, see below).
 - `docs/` — README images only: `vikey-icon.png` (logo), `screenshot.png` (menu + About window).
 - `Sources/ViKeySelfTest/` — engine tests as an executable (no XCTest, works with Command Line Tools only); reads
   the engine cases from `reference/cases.tsv` at run time.
@@ -56,8 +56,9 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
 ## Commands
 - `swift run -c release ViKeySelfTest` — engine tests
 - `python3 reference/test_engine.py` — reference tests
-- `bash build.sh` / `bash build.sh --install` — universal build, ad-hoc sign, copy to /Applications, reset + re-prompt
-  Accessibility (ad-hoc signature changes every build, so the TCC grant must be re-enabled).
+- `bash build.sh` / `bash build.sh --install` — universal build, sign (the "ViKey Code Signing" certificate if the
+  keychain has it, else ad-hoc; `VIKEY_SIGN_IDENTITY=<sha1|->` overrides), copy to /Applications. `--install` keeps
+  the Accessibility grant when the designated requirement is unchanged, else `tccutil reset` + re-prompt.
 - `open /Applications/ViKey.app --args --about` (after `pkill -x ViKey`) — launch with the About window open
   (`--settings` for the settings window).
 
@@ -90,9 +91,17 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   `dist/notes-X.Y.Z.md` (changes + install steps incl. the Gatekeeper workaround + SHA-256 + SSP endorsement line),
   then commits "Bump version to X.Y.Z", pushes, runs `gh release create` on that commit and checks the tag and
   `releases/latest`. Info.plist is restored on any failure before the commit. Do a `--dry-run` first (no git or
-  GitHub changes) and show the notes.
+  GitHub changes) and show the notes. The script refuses to build unless the keychain has the pinned certificate
+  (`SIGNING_CERT_SHA1`) and checks the built app's requirement names it.
 - CI: `.github/workflows/ci.yml` on push to main / PRs (macos-latest): Python reference tests, build.sh, bundle checks.
-- The app is ad-hoc signed, not notarized: first launch is blocked by Gatekeeper (right-click → Open, or
+- Signing (since 2026-11-27, first release after v1.0.9): self-signed "ViKey Code Signing" certificate in the user's
+  login keychain (RSA 3072, 20 years, SHA-1 19FE4391…F8D4), created by `scripts/make-signing-cert.sh`. Designated
+  requirement `identifier "dev.sunnysideprojects.vikey" and certificate root = H"19fe…"`, so TCC keeps the
+  Accessibility grant across builds and updates (users coming from ≤ v1.0.9 re-grant once). Not trusted by the system
+  (`CSSMERR_TP_NOT_TRUSTED`): codesign only finds it by SHA-1, not by name. codesign's key access was allowed once
+  ("Always Allow", by the user). Only this Mac has the key; if it is lost, make a new one, change the pin in
+  release.sh, and every user re-grants once. CI has no certificate and builds ad-hoc.
+- Not notarized: first launch is blocked by Gatekeeper (right-click → Open, or
   `xattr -dr com.apple.quarantine /Applications/ViKey.app`). Fixing that needs a paid Developer ID + notarization.
 - README links to `/releases/latest`, so it needs no edit per release.
 
