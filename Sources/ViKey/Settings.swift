@@ -33,10 +33,20 @@ enum Hotkey: String, CaseIterable {
     }
 }
 
-/// UserDefaults-backed preferences.
+/// UserDefaults-backed preferences. The settings window binds the same keys with `@AppStorage`;
+/// the defaults are registered here so both sides agree on them.
 final class Settings {
     static let shared = Settings()
     private let d = UserDefaults.standard
+
+    private init() {
+        d.register(defaults: [
+            "enabled": true, "method": InputMethod.telex.rawValue, "modernTone": false, "spellCheck": true,
+            "englishRestore": true, "escRevert": true, "smartSwitch": true, "browserFix": true,
+            "addressBarOnly": false, "hotkey": Hotkey.ctrlShift.rawValue, "macroEnabled": true,
+            "autoUpdateCheck": true,
+        ])
+    }
 
     private func bool(_ key: String, _ fallback: Bool) -> Bool {
         d.object(forKey: key) as? Bool ?? fallback

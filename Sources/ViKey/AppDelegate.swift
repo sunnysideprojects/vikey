@@ -12,23 +12,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let macroFile = MacroFile()
     private let lexicon = VietnameseLexicon()
     private let secureInput = SecureInputMonitor()
+    private let settingsState = SettingsState()
+    private var autoUpdateRunning = false
     private let updates = UpdateChecker(
         currentVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         engine = Engine(method: settings.method, modernTone: settings.modernTone, spellCheck: settings.spellCheck)
         keyTap = KeyTap(engine: engine)
-        keyTap.enabled = settings.enabled
-        keyTap.hotkey = settings.hotkey
-        keyTap.browserFix = settings.browserFix
-        keyTap.addressBarOnly = settings.addressBarOnly
-        keyTap.slowApps = settings.slowApps
-        keyTap.realKeyApps = settings.realKeyApps
         keyTap.frontBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         keyTap.onToggle = { [weak self] in self?.toggle() }
-        keyTap.macroEnabled = settings.macroEnabled
-        keyTap.englishRestore = settings.englishRestore
-        keyTap.escRevert = settings.escRevert
         keyTap.isWord = { [lexicon] in lexicon.contains($0) }
         lexicon.load()
         macroFile.onChange = { [weak self] table in
@@ -36,9 +29,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let table { self.keyTap.macros = table }
             self.refreshUI()
         }
+        updates.onChange = { [weak self] in self?.refreshUI() }
+        wireSettingsWindow()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        refreshUI()
+        applySettings()
+        // The settings window writes UserDefaults directly; apply whatever changed.
+        NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in self?.applySettings() }
 
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(appActivated(_:)),
@@ -52,14 +51,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         secureInput.start()
 
         startWhenTrusted()
-        macroFile.watch(settings.macroPath.map { URL(fileURLWithPath: $0) })
         // `open -a ViKey --args --about`: open the About window at launch (for checking the layout).
         if CommandLine.arguments.contains("--about") { AboutWindow.show() }
-
-        updates.onChange = { [weak self] in self?.refreshUI() }
-        if settings.autoUpdateCheck { updates.startAutomatic() }
+        // `--settings`: open the settings window at launch.
+        if CommandLine.arguments.contains("--settings") { showSettings() }
         // `--check-update`: run the manual check at launch (for checking the dialog).
         if CommandLine.arguments.contains("--check-update") { checkForUpdates() }
+    }
+
+    /// Pushes the stored preferences into the engine and the tap. Runs at launch and after every
+    /// UserDefaults change (menu or settings window), so it only acts on what differs.
+    private func applySettings() {
+        var wordStale = false
+        if engine.method != settings.method {
+            engine.method = settings.method
+            wordStale = true
+        }
+        if engine.spellCheck != settings.spellCheck {
+            engine.spellCheck = settings.spellCheck
+            wordStale = true
+        }
+        if keyTap.macroEnabled != settings.macroEnabled {
+            keyTap.macroEnabled = settings.macroEnabled
+            wordStale = true
+        }
+        if wordStale { keyTap.resetWord() }
+        engine.modernTone = settings.modernTone
+        keyTap.enabled = settings.enabled
+        keyTap.hotkey = settings.hotkey
+        keyTap.englishRestore = settings.englishRestore
+        keyTap.escRevert = settings.escRevert
+        keyTap.browserFix = settings.browserFix
+        keyTap.addressBarOnly = settings.addressBarOnly
+        keyTap.slowApps = settings.slowApps
+        keyTap.realKeyApps = settings.realKeyApps
+        if macroFile.url?.path != settings.macroPath {
+            macroFile.watch(settings.macroPath.map { URL(fileURLWithPath: $0) })
+        }
+        if settings.autoUpdateCheck != autoUpdateRunning {
+            autoUpdateRunning = settings.autoUpdateCheck
+            if autoUpdateRunning { updates.startAutomatic() } else { updates.stopAutomatic() }
+        }
+        refreshUI()
     }
 
     // MARK: - Accessibility
@@ -118,8 +151,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if settings.smartSwitch, let id = app?.bundleIdentifier, let saved = settings.appStates[id],
            saved != settings.enabled {
             setEnabled(saved, remember: false)
-        } else {
-            refreshUI()  // the fast-typing submenu names the front app
         }
     }
 
@@ -145,6 +176,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         statusItem.menu = buildMenu()
+        updateSettingsState()
     }
 
     private static let lockImage: NSImage? = NSImage(systemSymbolName: "lock.fill", accessibilityDescription: "Secure Input")?
@@ -177,127 +209,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(item("Telex", #selector(chooseTelex), checked: settings.method == .telex))
         menu.addItem(item("VNI", #selector(chooseVNI), checked: settings.method == .vni))
         menu.addItem(.separator())
-        menu.addItem(item("Đặt dấu kiểu mới (oà, uý)", #selector(toggleModern), checked: settings.modernTone))
-        menu.addItem(item("Kiểm tra chính tả, khôi phục từ tiếng Anh", #selector(toggleSpell), checked: settings.spellCheck))
-        let restore = item("Trả lại từ không có trong từ điển (law, yes, more)", #selector(toggleEnglishRestore),
-                           checked: settings.englishRestore)
-        restore.indentationLevel = 1
-        restore.toolTip = "Khi gõ Telex và hết từ, nếu từ vừa gõ thành chữ không có trong từ điển tiếng Việt "
-            + "của macOS (lă, ýe, mỏe) thì ViKey trả lại đúng các phím đã gõ. Cần bật kiểm tra chính tả."
-        menu.addItem(restore)
-        let esc = item("Esc: trả lại các phím đã gõ của từ vừa gõ (cả → car)", #selector(toggleEscRevert),
-                       checked: settings.escRevert)
-        esc.toolTip = "Ngay sau một từ bị đổi thành tiếng Việt, bấm Esc để lấy lại đúng các phím đã gõ. "
-            + "Lúc đó Esc không đến được app (bấm Esc lần nữa nếu cần). Tắt nếu bạn dùng vim."
-        menu.addItem(esc)
-        menu.addItem(item("Nhớ Việt/Anh theo từng ứng dụng", #selector(toggleSmart), checked: settings.smartSwitch))
-        menu.addItem(item("Sửa lỗi gợi ý trên thanh địa chỉ trình duyệt", #selector(toggleBrowserFix), checked: settings.browserFix))
-        let addressBar = item("Chỉ dùng ở thanh địa chỉ, không dùng trong trang web",
-                              settings.browserFix ? #selector(toggleAddressBarOnly) : nil,
-                              checked: settings.addressBarOnly)
-        addressBar.indentationLevel = 1
-        addressBar.toolTip = "Để sửa lỗi gợi ý, ViKey gõ thêm một ký tự đệm rồi xoá đi mỗi khi đổi chữ. Bật mục này "
-            + "thì ViKey hỏi macOS (qua Accessibility) ô đang gõ có nằm trong trang web không, và bỏ ký tự đệm ở đó: "
-            + "ít phím hơn, ít mất chữ hơn khi gõ nhanh. Trình duyệt có thể chậm đi một chút vì phải bật trợ năng."
-        menu.addItem(addressBar)
-        menu.addItem(fastTypingMenu())
-
-        let hk = NSMenuItem(title: "Phím chuyển Việt/Anh", action: nil, keyEquivalent: "")
-        let sub = NSMenu()
-        for (idx, h) in Hotkey.allCases.enumerated() {
-            sub.addItem(item(h.title, #selector(chooseHotkey(_:)), checked: settings.hotkey == h, tag: idx))
-        }
-        hk.submenu = sub
-        menu.addItem(hk)
-        menu.addItem(macroMenu())
         menu.addItem(toolsMenu())
-
-        menu.addItem(item("Khởi động cùng macOS", #selector(toggleLogin), checked: SMAppService.mainApp.status == .enabled))
-        menu.addItem(item("Tự kiểm tra cập nhật", #selector(toggleAutoUpdate), checked: settings.autoUpdateCheck))
         menu.addItem(.separator())
         if !keyTap.isRunning {
             menu.addItem(item("⚠️ Cấp quyền Accessibility…", #selector(openAccessibilitySettings)))
             menu.addItem(.separator())
         }
+        let prefs = item("Cài đặt…", #selector(showSettings))
+        prefs.keyEquivalent = ","
+        menu.addItem(prefs)
         menu.addItem(item("Kiểm tra cập nhật…", #selector(checkForUpdates)))
         menu.addItem(item("Giới thiệu ViKey", #selector(showAbout)))
-        menu.addItem(item("Thoát ViKey", #selector(quit)))
+        let quitItem = item("Thoát ViKey", #selector(quit))
+        quitItem.keyEquivalent = "q"
+        menu.addItem(quitItem)
         return menu
     }
 
-    // MARK: - Fast-typing fallbacks
+    // MARK: - Settings window
 
-    /// The app the user is typing in (the menu does not activate ViKey), unless that is ViKey.
-    private var targetApp: String? {
-        guard let id = keyTap.frontBundleID, id != Bundle.main.bundleIdentifier else { return nil }
-        return id
-    }
+    @objc private func showSettings() { SettingsWindow.show(state: settingsState) }
 
-    private func appName(_ id: String) -> String {
-        if let app = NSRunningApplication.runningApplications(withBundleIdentifier: id).first,
-           let name = app.localizedName { return name }
-        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
-            return url.deletingPathExtension().lastPathComponent
+    private func wireSettingsWindow() {
+        settingsState.chooseMacroFile = { [weak self] in self?.chooseMacroFile() }
+        settingsState.openMacroFile = { [weak self] in
+            if let url = self?.macroFile.url { NSWorkspace.shared.open(url) }
         }
-        return id
+        settingsState.reloadMacroFile = { [weak self] in self?.macroFile.reload(force: true) }
+        settingsState.clearMacroFile = { [weak self] in self?.settings.macroPath = nil }
+        settingsState.setLogin = { [weak self] on in self?.setLaunchAtLogin(on) }
+        settingsState.checkForUpdates = { [weak self] in self?.checkForUpdates() }
     }
 
-    private func fastTypingMenu() -> NSMenuItem {
-        let target = targetApp
-        let top = NSMenuItem(title: "Sửa lỗi mất chữ khi gõ nhanh", action: nil, keyEquivalent: "")
-        let sub = NSMenu()
-        sub.autoenablesItems = false
-        let header = NSMenuItem(title: "Chỉ áp dụng cho \(target.map(appName) ?? "ứng dụng đang dùng"):",
-                                action: nil, keyEquivalent: "")
-        header.isEnabled = false
-        sub.addItem(header)
-        let slow = item("Gõ chậm (nghỉ giữa các phím ViKey gửi)", #selector(toggleSlowApp),
-                        checked: target.map(settings.slowApps.contains) ?? false)
-        slow.toolTip = "Khi đổi chữ, ViKey gửi vài phím xoá rồi chữ mới. Mục này cho nghỉ 4 ms sau mỗi phím. "
-            + "Thử khi app này vẫn mất chữ hoặc ra chữ lộn xộn lúc gõ nhanh (máy ảo, remote desktop, một số app)."
-        let real = item("Gửi chữ cuối bằng chính phím vừa bấm", #selector(toggleRealKeyApp),
-                        checked: target.map(settings.realKeyApps.contains) ?? false)
-        real.toolTip = "Chữ cuối của phần đổi (à trong là) đi trong phím thật bạn vừa bấm, chỉ sửa nội dung, "
-            + "thay vì một phím giả. Thử khi app này bỏ mất chữ có dấu vừa gõ."
-        for i in [slow, real] {
-            i.isEnabled = target != nil
-            i.indentationLevel = 1
-            sub.addItem(i)
+    private func updateSettingsState() {
+        let state = settingsState
+        state.macroPath = macroFile.url?.path
+        switch macroFile.status {
+        case .none: state.macroInfo = "Đang đọc…"; state.macroFailed = false
+        case .loaded(let n): state.macroInfo = "\(n) mục"; state.macroFailed = false
+        case .failed: state.macroInfo = "Không đọc được file"; state.macroFailed = true
         }
-        let on = settings.slowApps.union(settings.realKeyApps).map(appName).sorted()
-        if !on.isEmpty {
-            sub.addItem(.separator())
-            let list = NSMenuItem(title: "Đang bật cho: \(on.joined(separator: ", "))", action: nil, keyEquivalent: "")
-            list.isEnabled = false
-            sub.addItem(list)
-        }
-        top.submenu = sub
-        if let target, settings.slowApps.contains(target) || settings.realKeyApps.contains(target) { top.state = .on }
-        return top
-    }
-
-    @objc private func toggleSlowApp() {
-        guard let id = targetApp else { return }
-        var apps = settings.slowApps
-        if apps.remove(id) == nil { apps.insert(id) }
-        settings.slowApps = apps
-        keyTap.slowApps = apps
-        refreshUI()
-    }
-
-    @objc private func toggleRealKeyApp() {
-        guard let id = targetApp else { return }
-        var apps = settings.realKeyApps
-        if apps.remove(id) == nil { apps.insert(id) }
-        settings.realKeyApps = apps
-        keyTap.realKeyApps = apps
-        refreshUI()
-    }
-
-    @objc private func toggleAddressBarOnly() {
-        settings.addressBarOnly.toggle()
-        keyTap.addressBarOnly = settings.addressBarOnly
-        refreshUI()
+        state.loginEnabled = SMAppService.mainApp.status == .enabled
+        state.syncFixApps(with: settings)
     }
 
     // MARK: - Clipboard tools
@@ -345,44 +298,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Abbreviations (gõ tắt)
 
-    private func macroMenu() -> NSMenuItem {
-        var title = "Gõ tắt"
-        if settings.macroEnabled, case .loaded(let n) = macroFile.status { title += " (\(n))" }
-        let top = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-        let sub = NSMenu()
-        sub.addItem(item("Bật gõ tắt", #selector(toggleMacro), checked: settings.macroEnabled))
-        sub.addItem(.separator())
-        sub.addItem(item("Chọn file gõ tắt (ukmacro.txt)…", #selector(chooseMacroFile)))
-        if let url = macroFile.url {
-            sub.addItem(item("Mở file để sửa", #selector(openMacroFile)))
-            sub.addItem(item("Đọc lại file", #selector(reloadMacroFile)))
-            sub.addItem(item("Bỏ chọn file", #selector(clearMacroFile)))
-            sub.addItem(.separator())
-            let info: String
-            switch macroFile.status {
-            case .none: info = url.lastPathComponent
-            case .loaded(let n): info = "\(url.lastPathComponent): \(n) mục"
-            case .failed: info = "⚠️ Không đọc được \(url.lastPathComponent)"
-            }
-            let i = NSMenuItem(title: info, action: nil, keyEquivalent: "")
-            i.toolTip = url.path
-            sub.addItem(i)
-        } else {
-            sub.addItem(.separator())
-            sub.addItem(NSMenuItem(title: "Chưa chọn file", action: nil, keyEquivalent: ""))
-        }
-        top.submenu = sub
-        return top
-    }
-
-    @objc private func toggleMacro() {
-        settings.macroEnabled.toggle()
-        keyTap.macroEnabled = settings.macroEnabled
-        keyTap.resetWord()
-        refreshUI()
-    }
-
-    @objc private func chooseMacroFile() {
+    private func chooseMacroFile() {
         let panel = NSOpenPanel()
         panel.title = "Chọn file gõ tắt của UniKey"
         panel.message = "Chọn ukmacro.txt (có thể nằm trong Google Drive để dùng chung với UniKey)."
@@ -397,88 +313,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        settings.macroPath = url.path
-        if !settings.macroEnabled {
-            settings.macroEnabled = true
-            keyTap.macroEnabled = true
-        }
-        macroFile.watch(url)
-        refreshUI()
-    }
-
-    @objc private func openMacroFile() {
-        if let url = macroFile.url { NSWorkspace.shared.open(url) }
-    }
-
-    @objc private func reloadMacroFile() { macroFile.reload(force: true) }
-
-    @objc private func clearMacroFile() {
-        settings.macroPath = nil
-        macroFile.watch(nil)
-        refreshUI()
+        settings.macroEnabled = true
+        settings.macroPath = url.path  // applySettings starts watching it
     }
 
     @objc private func menuToggle() { toggle() }
 
-    @objc private func chooseTelex() { setMethod(.telex) }
-    @objc private func chooseVNI() { setMethod(.vni) }
-    private func setMethod(_ m: InputMethod) {
-        settings.method = m
-        engine.method = m
-        keyTap.resetWord()
-        refreshUI()
-    }
+    @objc private func chooseTelex() { settings.method = .telex }
+    @objc private func chooseVNI() { settings.method = .vni }
 
-    @objc private func toggleModern() {
-        settings.modernTone.toggle()
-        engine.modernTone = settings.modernTone
-        refreshUI()
-    }
-
-    @objc private func toggleSpell() {
-        settings.spellCheck.toggle()
-        engine.spellCheck = settings.spellCheck
-        keyTap.resetWord()
-        refreshUI()
-    }
-
-    @objc private func toggleEnglishRestore() {
-        settings.englishRestore.toggle()
-        keyTap.englishRestore = settings.englishRestore
-        refreshUI()
-    }
-
-    @objc private func toggleEscRevert() {
-        settings.escRevert.toggle()
-        keyTap.escRevert = settings.escRevert
-        refreshUI()
-    }
-
-    @objc private func toggleSmart() {
-        settings.smartSwitch.toggle()
-        refreshUI()
-    }
-
-    @objc private func toggleBrowserFix() {
-        settings.browserFix.toggle()
-        keyTap.browserFix = settings.browserFix
-        refreshUI()
-    }
-
-    @objc private func chooseHotkey(_ sender: NSMenuItem) {
-        let h = Hotkey.allCases[sender.tag]
-        settings.hotkey = h
-        keyTap.hotkey = h
-        refreshUI()
-    }
-
-    @objc private func toggleLogin() {
+    private func setLaunchAtLogin(_ on: Bool) {
         do {
-            if SMAppService.mainApp.status == .enabled {
-                try SMAppService.mainApp.unregister()
-            } else {
-                try SMAppService.mainApp.register()
-            }
+            if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
         } catch {
             NSAlert(error: error).runModal()
         }
@@ -486,12 +332,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // MARK: - Updates
-
-    @objc private func toggleAutoUpdate() {
-        settings.autoUpdateCheck.toggle()
-        if settings.autoUpdateCheck { updates.startAutomatic() } else { updates.stopAutomatic() }
-        refreshUI()
-    }
 
     @objc private func openReleasePage() {
         NSWorkspace.shared.open(updates.available?.page ?? UpdateChecker.releasesPage)

@@ -26,7 +26,12 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
 - `Sources/ViKey/` — `KeyTap.swift` (event tap + output), `Lexicon.swift` (real Vietnamese syllables for the
   word-end English restore: checks all ~32k `Vietnamese.syllableCandidates()` once with `NSSpellChecker` "vi" in
   50-word main-thread batches, ~9 s, keeps ~6.7k, caches `~/Library/Application Support/ViKey/syllables.txt` keyed
-  by macOS version; until ready or if the count looks wrong every word counts as real = no restore), `AppDelegate.swift` (menu, Accessibility, per-app state),
+  by macOS version; until ready or if the count looks wrong every word counts as real = no restore), `AppDelegate.swift` (short menu, Accessibility, per-app state;
+  `applySettings()` pushes UserDefaults into the engine/tap at launch and on every `UserDefaults.didChangeNotification`),
+  `SettingsWindow.swift` ("Cài đặt…" ⌘,: NSTabViewController toolbar tabs Gõ phím / Gõ tắt / Tương thích / Chung,
+  each a SwiftUI grouped Form with fixed size; plain prefs are `@AppStorage` on the same keys as `Settings`, which
+  registers the defaults; `SettingsState` carries macro status, login item, the fast-typing app list and actions;
+  remembers the last tab in `settingsTab`; `--settings` launch arg opens it),
   `Settings.swift` (UserDefaults), `MacroFile.swift` (polls the chosen ukmacro.txt every 3 s off the main thread,
   read-only, so it can sit in Google Drive and be shared with UniKey on Windows), `SecureInput.swift` (polls
   `IsSecureEventInputEnabled` every 1 s; holder app from the session's `kCGSSessionSecureInputPID`, which names
@@ -53,7 +58,8 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
 - `python3 reference/test_engine.py` — reference tests
 - `bash build.sh` / `bash build.sh --install` — universal build, ad-hoc sign, copy to /Applications, reset + re-prompt
   Accessibility (ad-hoc signature changes every build, so the TCC grant must be re-enabled).
-- `open /Applications/ViKey.app --args --about` (after `pkill -x ViKey`) — launch with the About window open.
+- `open /Applications/ViKey.app --args --about` (after `pkill -x ViKey`) — launch with the About window open
+  (`--settings` for the settings window).
 
 ## Icon and README images
 - App icon: cream "Vi" keycap sticker (ink border + hard ink shadow) on a yolk squircle, Bricolage ExtraBold.
@@ -63,7 +69,12 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   `CGWindowListCopyWindowInfo`, owner "ViKey": About is layer 0, the open menu is a non-zero layer). Claude has Screen
   Recording permission (granted 2026-11-24). The computer-use tools cannot target ViKey (LSUIElement, not in the app
   index), so for the menu run a small poller that captures the first ViKey window with layer != 0 and ask the user to
-  click the menu bar item. Menus come out grey (no vibrancy backdrop); that is expected.
+  click the menu bar item. Menus come out grey (no vibrancy backdrop); that is expected. The status menu follows the
+  system appearance even when ViKey runs with `-NSRequiresAquaSystemAppearance YES`, so capture About in the same mode
+  (the 2026-11-27 screenshot is dark: short menu + About). A locked screen makes every
+  capture black (check `CGSSessionScreenIsLocked`); then a temporary in-app hook that `cacheDisplay`s the window's
+  frame view to PNG still works. The unbundled `swift build` binary uses the `ViKey` defaults domain, not
+  `dev.sunnysideprojects.vikey`, so sample settings for it do not touch the installed app.
   Then `swift scripts/frame-screenshots.swift docs/screenshot.png menu.png about.png` (yolk-soft backdrop, radius-lg,
   2 pt ink border, per the brand book's screenshot rule). README shows it at half size (`width="925"`).
 
@@ -88,13 +99,13 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
 ## Engine rules worth knowing
 - Spell check on: a transform is applied only if the result stays a valid Vietnamese syllable prefix; if the word is
   invalid, output = raw keys minus "undo" keys (`tesst` → `test`, `windows` stays `windows`).
-- Word-end restore (Telex only, menu "Trả lại từ không có trong từ điển", default on, needs spell check): on
+- Word-end restore (Telex only, setting "Trả lại từ không có trong từ điển", default on, needs spell check): on
   space/Return/Tab/punctuation, if the output has diacritics and its lowercase old-style spelling is not a real
   syllable, KeyTap retypes the raw keys (`law`→`lă`→`law`, `yes`, `more`, `door`). Real words stay (`car`→`cả`,
   `sex`→`sẽ`). Doubled-letter words still need a third letter (`bosss`→`boss`): `ass`→`as` and `tesst`→`test` win.
   `Engine.restoreIfNotWord(isWord:)` / `restore_if_not_word`.
 - Repeat a mark key to undo it and type it literally (`ass` → `as`, `aaa` → `aa`).
-- Esc revert (menu "Esc: trả lại các phím đã gõ…", default on, both methods): Esc while a converted word is in
+- Esc revert (setting "Esc trả lại các phím đã gõ", default on, both methods): Esc while a converted word is in
   progress swallows the Esc and retypes the raw keys under the Space keycode (`car` → `cả` → Esc → `car`); the
   engine then stays inert (literal) until the word ends. Nothing to undo → Esc passes through, so a second Esc
   always reaches the app. Conflicts with vim's Esc in insert mode (tooltip says to turn it off).
@@ -120,8 +131,8 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   fast, so the app dropped them); now they reuse the keycode of the swallowed key. Also `engine.reset()` when the
   tap gets disabled by timeout. The "la2m" symptom was only a consequence: the screen lost a char the engine still
   had, so the retyped word looked invalid and mark keys passed through. If it ever comes back: find out which app,
-  compare with TextEdit, then try the fallbacks (menu "Sửa lỗi mất chữ khi gõ nhanh", all off by default):
-  per app (`slowApps` / `realKeyApps` bundle IDs; the submenu names the front app, rebuilt on app switch)
+  compare with TextEdit, then try the fallbacks (Settings → Tương thích, all off by default):
+  per app (`slowApps` / `realKeyApps` bundle IDs; list with "Gõ chậm" / "Phím thật" checkboxes, add from running apps)
   (a) "Gửi chữ cuối bằng chính phím vừa bấm": the last char of a change is written into the real key event, which
   is then passed through (events posted from the tap enter the system before the returned one), (b) "Gõ chậm":
   4 ms `usleep` after each synthetic key inside the tap callback (keeps the order, blocks typing briefly); global
@@ -132,4 +143,4 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
 - Known limits: no typing under Secure Input (password fields; shown with a lock in the menu bar), no restoring an old word after the caret moved, Unicode only.
 
 ## Conventions
-- Code and comments in English; user-facing menu strings in Vietnamese.
+- Code and comments in English; user-facing menu and settings strings in Vietnamese.
