@@ -84,7 +84,7 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   `main`, MIT (font OFL, SSP logo all rights reserved; see LICENSE). `origin` uses the SSH host alias
   `github.com-personal` (personal key, account nhatnx); `gh` is logged in as nhatnx.
 - Never commit `ukmacro.txt` (the user's personal abbreviations, gitignored), `build/`, `dist/`.
-- Releases (latest v1.0.9, 2026-11-27): `scripts/release.sh X.Y.Z changes.md [--dry-run]`. changes.md is the
+- Releases (latest v1.0.10, 2026-11-27): `scripts/release.sh X.Y.Z changes.md [--dry-run]`. changes.md is the
   release-specific part of the notes in Vietnamese (one-line summary + `## Thay đổi` bullets); write it in the
   scratchpad, not the repo. The script checks (on main, clean, in sync with origin, tag free, version newer), bumps
   `CFBundleShortVersionString` and `CFBundleVersion` (+1), runs build.sh, zips to `dist/ViKey-X.Y.Z.zip`, writes
@@ -94,7 +94,7 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   GitHub changes) and show the notes. The script refuses to build unless the keychain has the pinned certificate
   (`SIGNING_CERT_SHA1`) and checks the built app's requirement names it.
 - CI: `.github/workflows/ci.yml` on push to main / PRs (macos-latest): Python reference tests, build.sh, bundle checks.
-- Signing (since 2026-11-27, first release after v1.0.9): self-signed "ViKey Code Signing" certificate in the user's
+- Signing (since v1.0.10, 2026-11-27): self-signed "ViKey Code Signing" certificate in the user's
   login keychain (RSA 3072, 20 years, SHA-1 19FE4391…F8D4), created by `scripts/make-signing-cert.sh`. Designated
   requirement `identifier "dev.sunnysideprojects.vikey" and certificate root = H"19fe…"`, so TCC keeps the
   Accessibility grant across builds and updates (users coming from ≤ v1.0.9 re-grant once). Not trusted by the system
@@ -134,7 +134,8 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
 - Shipped 2026-11-24: app icon, About window, gõ tắt, public repo, release v1.0.0, README logo + screenshot.
 - Shipped 2026-11-27 (v1.0.5): word-end English restore from the macOS Vietnamese dictionary; (v1.0.6) Esc
   revert; (v1.0.7) clipboard tools; (v1.0.8) fast-typing fallbacks (all off by default); (v1.0.9) Settings
-  window + short menu. None of these confirmed by the user in real apps yet.
+  window + short menu. None of these confirmed by the user in real apps yet. (v1.0.10) stable self-signed
+  signing; checked 2026-11-27 that a rebuild keeps the Accessibility grant (event tap enabled, no re-grant).
 - Fixed (user confirmed 2026-11-16): fast typing dropped text ("làm" → "lm"; after deleting and retyping → "a2a2" /
   "la2m"). User types VNI. Cause: synthetic text events used keycode 0 (= the A key, often still held when typing
   fast, so the app dropped them); now they reuse the keycode of the swallowed key. Also `engine.reset()` when the
