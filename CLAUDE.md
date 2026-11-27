@@ -101,7 +101,7 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   `main`, MIT (font OFL, SSP logo all rights reserved; see LICENSE). `origin` uses the SSH host alias
   `github.com-personal` (personal key, account nhatnx); `gh` is logged in as nhatnx.
 - Never commit `ukmacro.txt` (the user's personal abbreviations, gitignored), `build/`, `dist/`.
-- Releases (latest v1.0.10, 2026-11-27): `scripts/release.sh X.Y.Z changes.md [--dry-run]`. changes.md is the
+- Releases (latest v1.0.11, 2026-11-28): `scripts/release.sh X.Y.Z changes.md [--dry-run]`. changes.md is the
   release-specific part of the notes in Vietnamese (one-line summary + `## Thay đổi` bullets); write it in the
   scratchpad, not the repo. The script checks (on main, clean, in sync with origin, tag free, version newer), bumps
   `CFBundleShortVersionString` and `CFBundleVersion` (+1), runs build.sh, zips to `dist/ViKey-X.Y.Z.zip`, writes
@@ -159,7 +159,7 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   revert; (v1.0.7) clipboard tools; (v1.0.8) fast-typing fallbacks (all off by default); (v1.0.9) Settings
   window + short menu. None of these confirmed by the user in real apps yet. (v1.0.10) stable self-signed
   signing; checked 2026-11-27 that a rebuild keeps the Accessibility grant (event tap enabled, no re-grant).
-- Built 2026-11-27, not released: backspace into the previous word (not tried by the user in real apps yet).
+- Shipped 2026-11-28 (v1.0.11): backspace into the previous word (not tried by the user in real apps yet).
 - Built 2026-11-28: end-to-end typing test; 39 cases pass in its own window (8 ms and 0 ms between keys) and in
   TextEdit. Not run against Chrome/Electron apps yet (the fast-typing bugs were there).
 - Fixed (user confirmed 2026-11-16): fast typing dropped text ("làm" → "lm"; after deleting and retyping → "a2a2" /
