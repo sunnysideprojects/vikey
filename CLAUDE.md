@@ -67,7 +67,7 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   `main`, MIT (font OFL, SSP logo all rights reserved; see LICENSE). `origin` uses the SSH host alias
   `github.com-personal` (personal key, account nhatnx); `gh` is logged in as nhatnx.
 - Never commit `ukmacro.txt` (the user's personal abbreviations, gitignored), `build/`, `dist/`.
-- Releases (latest v1.0.5, 2026-11-27): `scripts/release.sh X.Y.Z changes.md [--dry-run]`. changes.md is the
+- Releases (latest v1.0.6, 2026-11-27): `scripts/release.sh X.Y.Z changes.md [--dry-run]`. changes.md is the
   release-specific part of the notes in Vietnamese (one-line summary + `## Thay đổi` bullets); write it in the
   scratchpad, not the repo. The script checks (on main, clean, in sync with origin, tag free, version newer), bumps
   `CFBundleShortVersionString` and `CFBundleVersion` (+1), runs build.sh, zips to `dist/ViKey-X.Y.Z.zip`, writes
@@ -107,8 +107,8 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
 - On this macOS the status item has no window owned by ViKey in `CGWindowListCopyWindowInfo`; to check the menu bar
   icon, capture the screen strip instead (`screencapture -x -R<x>,0,900,30`).
 - Shipped 2026-11-24: app icon, About window, gõ tắt, public repo, release v1.0.0, README logo + screenshot.
-- Shipped 2026-11-27 (v1.0.5): word-end English restore from the macOS Vietnamese dictionary; typing not yet
-  confirmed by the user in real apps.
+- Shipped 2026-11-27 (v1.0.5): word-end English restore from the macOS Vietnamese dictionary; (v1.0.6) Esc
+  revert. Typing for both not yet confirmed by the user in real apps.
 - Fixed (user confirmed 2026-11-16): fast typing dropped text ("làm" → "lm"; after deleting and retyping → "a2a2" /
   "la2m"). User types VNI. Cause: synthetic text events used keycode 0 (= the A key, often still held when typing
   fast, so the app dropped them); now they reuse the keycode of the swallowed key. Also `engine.reset()` when the
