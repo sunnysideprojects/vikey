@@ -99,7 +99,7 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   `main`, MIT (font OFL, SSP logo all rights reserved; see LICENSE). `origin` uses the SSH host alias
   `github.com-personal` (personal key, account nhatnx); `gh` is logged in as nhatnx.
 - Never commit `ukmacro.txt` (the user's personal abbreviations, gitignored), `build/`, `dist/`.
-- Releases (latest v1.0.11, 2026-11-28): `scripts/release.sh X.Y.Z changes.md [--dry-run]`. changes.md is the
+- Releases (latest v1.0.12, 2026-11-28): `scripts/release.sh X.Y.Z changes.md [--dry-run]`. changes.md is the
   release-specific part of the notes in Vietnamese (one-line summary + `## Thay đổi` bullets); write it in the
   scratchpad, not the repo. The script checks (on main, clean, in sync with origin, tag free, version newer), bumps
   `CFBundleShortVersionString` and `CFBundleVersion` (+1), runs build.sh, zips to `dist/ViKey-X.Y.Z.zip`, writes
@@ -122,7 +122,7 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   (`defaults write dev.sunnysideprojects.vikey SUFeedURL http://127.0.0.1:8765/appcast.xml` + `python3 -m
   http.server`; remove the default afterwards): 1.0.11 → 1.0.99 installed and relaunched, signature kept, no
   quarantine, event tap running without re-granting. The first try failed with "error extracting the archive":
-  the disk was full. Releases ≤ v1.0.11 have no Sparkle and no appcast; the first release after it starts the feed.
+  the disk was full. Releases ≤ v1.0.11 have no Sparkle and no appcast; v1.0.12 started the feed.
 - CI: `.github/workflows/ci.yml` on push to main / PRs (macos-latest): Python reference tests, build.sh, bundle checks.
 - Signing (since v1.0.10, 2026-11-27): self-signed "ViKey Code Signing" certificate in the user's
   login keychain (RSA 3072, 20 years, SHA-1 19FE4391…F8D4), created by `scripts/make-signing-cert.sh`. Designated
@@ -173,7 +173,10 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   window + short menu. None of these confirmed by the user in real apps yet. (v1.0.10) stable self-signed
   signing; checked 2026-11-27 that a rebuild keeps the Accessibility grant (event tap enabled, no re-grant).
 - Shipped 2026-11-28 (v1.0.11): backspace into the previous word (not tried by the user in real apps yet).
-- Built 2026-11-28, not released: Sparkle in-app updates (the user clicked Install in the local-feed test).
+- Shipped 2026-11-28 (v1.0.12): Sparkle in-app updates (the user clicked Install in the local-feed test). v1.0.12
+  is the first release with an appcast; users on ≤ v1.0.11 install it by hand, later releases arrive in-app.
+  Real update from the GitHub feed checked 2026-11-28 on the user's Mac (a local 1.0.11 build with Sparkle →
+  v1.0.12): installed, relaunched, same signature, no quarantine, event tap running without re-granting.
 - Built 2026-11-28: end-to-end typing test; 39 cases pass in its own window (8 ms and 0 ms between keys) and in
   TextEdit. Not run against Chrome/Electron apps yet (the fast-typing bugs were there).
 - Fixed (user confirmed 2026-11-16): fast typing dropped text ("làm" → "lm"; after deleting and retyping → "a2a2" /
