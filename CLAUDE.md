@@ -18,6 +18,11 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   update check; Swift only, covered by the self-test.
 - `Sources/ViKeyCore/Macro.swift` — abbreviation table ("gõ tắt") in UniKey `ukmacro.txt` format (UTF-8/BOM/CRLF or
   UTF-16, `;` comment lines, `key:value`). Swift only, not in the Python reference.
+- `Sources/ViKeyCore/TextTools.swift` — `TextTool` conversions for the menu "Chuyển văn bản trong clipboard"
+  (AppDelegate `runTool` rewrites the clipboard as plain text, beeps if no text / no change): bỏ dấu, HOA, thường,
+  Hoa Đầu Từ, TCVN3 (ABC) → Unicode (table checked against `iconv -f TCVN`, incl. the VN1 capitals; toned
+  capitals from .VnTimeH fonts come out lower case), VNI Windows → Unicode (base + mark char; no external
+  converter to check against, only the canonical examples), NFD → NFC. Swift only; cases in the self-test.
 - `Sources/ViKey/` — `KeyTap.swift` (event tap + output), `Lexicon.swift` (real Vietnamese syllables for the
   word-end English restore: checks all ~32k `Vietnamese.syllableCandidates()` once with `NSSpellChecker` "vi" in
   50-word main-thread batches, ~9 s, keeps ~6.7k, caches `~/Library/Application Support/ViKey/syllables.txt` keyed

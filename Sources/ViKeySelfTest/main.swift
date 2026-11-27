@@ -176,6 +176,29 @@ if let data = try? Data(contentsOf: realFile) {
     print("ukmacro.txt: \(entries.count) entries checked")
 }
 
+// MARK: - Clipboard tools
+
+let toolCases: [(TextTool, String, String)] = [
+    (.removeAccents, "Tiếng Việt, Đà Nẵng, thuở, ngoằn ngoèo", "Tieng Viet, Da Nang, thuo, ngoan ngoeo"),
+    (.removeAccents, "Ti\u{0065}\u{0302}\u{0301}ng", "Tieng"),
+    (.upper, "đường phố Hà Nội", "ĐƯỜNG PHỐ HÀ NỘI"),
+    (.lower, "ĐƯỜNG PHỐ HÀ NỘI", "đường phố hà nội"),
+    (.titleCase, "NGUYỄN văn a, đỗ thị-bình (hà nội)", "Nguyễn Văn A, Đỗ Thị-Bình (Hà Nội)"),
+    (.fromTCVN3, "Hµ Néi, §µ N½ng, TiÕng ViÖt, ®­êng, Th¸i B×nh", "Hà Nội, Đà Nẵng, Tiếng Việt, đường, Thái Bình"),
+    (.fromTCVN3, "Céng hoµ x· héi chñ nghÜa ViÖt Nam", "Cộng hoà xã hội chủ nghĩa Việt Nam"),
+    (.fromVNI, "Coäng hoøa xaõ hoäi chuû nghóa Vieät Nam", "Cộng hòa xã hội chủ nghĩa Việt Nam"),
+    (.fromVNI, "Ñaø Naüng, ñöôïc, ngöôøi, THAØNH PHOÁ HOÀ CHÍ MINH", "Đà Nẵng, được, người, THÀNH PHỐ HỒ CHÍ MINH"),
+    (.fromVNI, "kyõ thuaät, ñaëc bieät, khuyûu, Ñ", "kỹ thuật, đặc biệt, khuỷu, Đ"),
+    (.composeNFC, "Vi\u{0065}\u{0323}\u{0302}t", "Việt"),
+]
+for (tool, input, expected) in toolCases {
+    let got = tool.apply(input)
+    if got != expected || got.unicodeScalars.count != expected.unicodeScalars.count {
+        failures += 1
+        print("TOOL FAIL \(tool) \(input) -> \(got) (expected \(expected))")
+    }
+}
+
 // MARK: - Versions (update check)
 
 func v(_ s: String) -> AppVersion? { AppVersion(s) }
@@ -198,7 +221,7 @@ for bad in ["", "v", "beta", "1..2", "1.x", "١.٢"] where v(bad) != nil {
 check("version description", v("v1.0.3")?.description, "1.0.3")
 
 if failures == 0 {
-    print("ViKey self-test: \(cases.count + restoreCases.count + revertCases.count + bsCases.count) cases + fuzz OK, \(candidates.count) syllable candidates")
+    print("ViKey self-test: \(cases.count + restoreCases.count + revertCases.count + bsCases.count + toolCases.count) cases + fuzz OK, \(candidates.count) syllable candidates")
 } else {
     print("ViKey self-test: \(failures) failure(s)")
     exit(1)

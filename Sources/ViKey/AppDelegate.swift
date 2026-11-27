@@ -196,6 +196,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hk.submenu = sub
         menu.addItem(hk)
         menu.addItem(macroMenu())
+        menu.addItem(toolsMenu())
 
         menu.addItem(item("Khởi động cùng macOS", #selector(toggleLogin), checked: SMAppService.mainApp.status == .enabled))
         menu.addItem(item("Tự kiểm tra cập nhật", #selector(toggleAutoUpdate), checked: settings.autoUpdateCheck))
@@ -208,6 +209,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(item("Giới thiệu ViKey", #selector(showAbout)))
         menu.addItem(item("Thoát ViKey", #selector(quit)))
         return menu
+    }
+
+    // MARK: - Clipboard tools
+
+    private static let toolTitles: [(TextTool, String)] = [
+        (.removeAccents, "Bỏ dấu (Tiếng Việt → Tieng Viet)"),
+        (.upper, "CHỮ HOA"),
+        (.lower, "chữ thường"),
+        (.titleCase, "Viết Hoa Đầu Mỗi Từ"),
+        (.fromTCVN3, "TCVN3 (ABC) → Unicode"),
+        (.fromVNI, "VNI Windows → Unicode"),
+        (.composeNFC, "Unicode tổ hợp → Unicode dựng sẵn"),
+    ]
+
+    private func toolsMenu() -> NSMenuItem {
+        let top = NSMenuItem(title: "Chuyển văn bản trong clipboard", action: nil, keyEquivalent: "")
+        let sub = NSMenu()
+        let hint = NSMenuItem(title: "Sao chép (⌘C), chọn lệnh, rồi dán (⌘V)", action: nil, keyEquivalent: "")
+        sub.addItem(hint)
+        sub.addItem(.separator())
+        for (idx, (tool, title)) in Self.toolTitles.enumerated() {
+            if tool == .fromTCVN3 { sub.addItem(.separator()) }
+            sub.addItem(item(title, #selector(runTool(_:)), tag: idx))
+        }
+        top.submenu = sub
+        return top
+    }
+
+    /// Converts the text on the clipboard in place (plain text; formatting is dropped).
+    /// Beeps when there is no text or nothing changed.
+    @objc private func runTool(_ sender: NSMenuItem) {
+        let pb = NSPasteboard.general
+        guard let text = pb.string(forType: .string) else {
+            NSSound.beep()
+            return
+        }
+        let result = Self.toolTitles[sender.tag].0.apply(text)
+        guard result != text else {
+            NSSound.beep()
+            return
+        }
+        pb.clearContents()
+        pb.setString(result, forType: .string)
     }
 
     // MARK: - Abbreviations (gõ tắt)
