@@ -24,6 +24,14 @@ for line in open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'revert
     got=e.revert() or '-'
     for ch in more: e.process(ch)
     if got!=exp or e.output!=final: fails+=1; print('REVERT FAIL',m,inp,'->',got,e.output,'expected',exp,final)
+# resume an earlier word (resume.tsv: method, word on screen, keys typed after, expected output)
+for line in open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'resume.tsv'),encoding='utf-8'):
+    if not line.strip(): continue
+    m,word,more,exp=line.rstrip('\n').split('\t')
+    e=Engine(method=m)
+    e.resume(word)
+    for ch in more: e.process(ch)
+    if e.output!=exp: fails+=1; print('RESUME FAIL',m,word,more,'->',e.output,'expected',exp)
 # backspace: type word, backspace, should equal output minus last char, then continue typing
 def bs(m,word,n,more,exp):
     global fails

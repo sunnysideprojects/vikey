@@ -42,7 +42,7 @@ final class Settings {
     private init() {
         d.register(defaults: [
             "enabled": true, "method": InputMethod.telex.rawValue, "modernTone": false, "spellCheck": true,
-            "englishRestore": true, "escRevert": true, "smartSwitch": true, "browserFix": true,
+            "englishRestore": true, "escRevert": true, "backspaceResume": true, "smartSwitch": true, "browserFix": true,
             "addressBarOnly": false, "hotkey": Hotkey.ctrlShift.rawValue, "macroEnabled": true,
             "autoUpdateCheck": true,
         ])
@@ -79,6 +79,11 @@ final class Settings {
     var escRevert: Bool {
         get { bool("escRevert", true) }
         set { d.set(newValue, forKey: "escRevert") }
+    }
+
+    var backspaceResume: Bool {
+        get { bool("backspaceResume", true) }
+        set { d.set(newValue, forKey: "backspaceResume") }
     }
     /// Remember on/off per application.
     var smartSwitch: Bool {

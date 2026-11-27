@@ -133,14 +133,20 @@ public final class Engine {
     public func backspace() -> Bool {
         let text = output
         guard !text.isEmpty else { return false }
-        let target = String(text.dropLast())
-        reset()
-        for k in Self.synthKeys(target, method: method) { process(k) }
-        if output != target {
-            reset()
-            inert = target
-        }
+        resume(String(text.dropLast()))
         return true
+    }
+
+    /// Start from `word` already on screen, as if it had just been typed: after a backspace, or
+    /// when the caret is back right after an earlier word (`tieng ` ⌫ `s` -> `tiếng`). State is
+    /// rebuilt from synthesized keys; a word they cannot reproduce stays literal until reset.
+    public func resume(_ word: String) {
+        reset()
+        for k in Self.synthKeys(word, method: method) { process(k) }
+        if output != word {
+            reset()
+            inert = word
+        }
     }
 
     // MARK: - Actions

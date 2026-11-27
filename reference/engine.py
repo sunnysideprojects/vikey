@@ -338,14 +338,16 @@ class Engine:
         text = self.output
         if not text:
             return False
-        target = text[:-1]
-        self.reset()
-        for k in synth_keys(target, self.method):
-            self.process(k)
-        if self.output != target:
-            self.reset()
-            self.inert = target
+        self.resume(text[:-1])
         return True
+
+    def resume(self, word):
+        self.reset()
+        for k in synth_keys(word, self.method):
+            self.process(k)
+        if self.output != word:
+            self.reset()
+            self.inert = word
 
 
 TONE_FROM_COMBINING = {c: i for i, c in enumerate(COMBINING_TONE) if c}

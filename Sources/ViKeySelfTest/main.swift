@@ -68,6 +68,27 @@ for f in revertCases {
     }
 }
 
+// Resume an earlier word, shared with the Python reference: reference/resume.tsv
+// (method, word on screen, keys typed after, expected output).
+let resumeText = (try? String(contentsOf: casesFile.deletingLastPathComponent()
+    .appendingPathComponent("resume.tsv"), encoding: .utf8)) ?? ""
+let resumeCases = resumeText.split(separator: "\n")
+    .map { $0.split(separator: "\t", omittingEmptySubsequences: false).map(String.init) }
+    .filter { $0.count == 4 }
+if resumeCases.isEmpty {
+    failures += 1
+    print("RESUME FAIL: cannot read reference/resume.tsv")
+}
+for f in resumeCases {
+    let e = Engine(method: InputMethod(rawValue: f[0])!)
+    e.resume(f[1])
+    for ch in f[2] { e.process(ch) }
+    if e.output != f[3] {
+        failures += 1
+        print("RESUME FAIL [\(f[0])] \(f[1]) +\(f[2]) -> \(e.output) (expected \(f[3]))")
+    }
+}
+
 let candidates = Vietnamese.syllableCandidates()
 for w in ["khách", "ngày", "nghiêng", "thuở", "quýt", "gìn", "đồng", "khuỷu", "lă", "hòa", "thủy"]
     where !candidates.contains(w) {
@@ -116,6 +137,60 @@ for _ in 0..<20000 {
         print("FUZZ FAIL [\(method)] \(word): \(before) -> \(e.output)")
         break
     }
+}
+
+// Backspace into the previous word. Mirrors KeyTap: letters go to the engine, a space or
+// punctuation ends the word into RecentText, "<" is a backspace the app has already applied.
+// After every key, RecentText + the engine word must equal what a plain editor would show.
+func typeLine(_ keys: String, method: InputMethod = .telex, resume: Bool = true) -> String {
+    let e = Engine(method: method)
+    var recent = RecentText()
+    var screen = ""
+    for ch in keys {
+        if ch == "<" {
+            screen = String(screen.dropLast())
+            if !e.backspace(), let word = recent.backspace(resume: resume) { e.resume(word) }
+        } else if ch.isLetter || (method == .vni && ch.isNumber && !e.output.isEmpty) {
+            let before = e.output
+            screen = String(screen.dropLast(before.count)) + e.process(ch)
+        } else {
+            recent.append(e.output + String(ch))
+            e.reset()
+            screen.append(ch)
+        }
+        if recent.text + e.output != screen {
+            failures += 1
+            print("RECENT FAIL \(keys): tracked \(recent.text)|\(e.output), screen \(screen)")
+            break
+        }
+    }
+    return screen
+}
+let lineCases: [(String, InputMethod, Bool, String)] = [
+    ("tieeng <s", .telex, true, "tiếng"),
+    ("tieeng <s", .telex, false, "tiêngs"),
+    ("tieeng <<s", .telex, true, "tiến"),
+    ("xin chao <f", .telex, true, "xin chào"),
+    ("xin chao <<<<<<f", .telex, true, "xìn"),
+    ("toi. <<s", .telex, true, "tói"),
+    ("a.b<<s", .telex, true, "á"),
+    ("law <s", .telex, true, "lắ"),  // no English restore in this model
+    ("tieng <1", .vni, true, "tiéng"),
+    ("toi6 <1", .vni, true, "tối"),
+    ("<<a", .telex, true, "a"),
+]
+for (keys, method, resume, expected) in lineCases {
+    let got = typeLine(keys, method: method, resume: resume)
+    if got != expected {
+        failures += 1
+        print("RECENT FAIL [\(method)] \(keys) -> \(got) (expected \(expected))")
+    }
+}
+var longText = RecentText()
+for _ in 0..<40 { longText.append("abc de ") }
+if longText.text.count > 120 || !longText.text.hasPrefix("abc de") {
+    failures += 1
+    print("RECENT FAIL: trimmed to \(longText.text.count) chars starting \(longText.text.prefix(8))")
 }
 
 // MARK: - Abbreviations (gõ tắt)
@@ -220,8 +295,10 @@ for bad in ["", "v", "beta", "1..2", "1.x", "١.٢"] where v(bad) != nil {
 }
 check("version description", v("v1.0.3")?.description, "1.0.3")
 
+let caseCounts: [Int] = [cases.count, restoreCases.count, revertCases.count, resumeCases.count, bsCases.count,
+                         lineCases.count, toolCases.count]
 if failures == 0 {
-    print("ViKey self-test: \(cases.count + restoreCases.count + revertCases.count + bsCases.count + toolCases.count) cases + fuzz OK, \(candidates.count) syllable candidates")
+    print("ViKey self-test: \(caseCounts.reduce(0, +)) cases + fuzz OK, \(candidates.count) syllable candidates")
 } else {
     print("ViKey self-test: \(failures) failure(s)")
     exit(1)

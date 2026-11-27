@@ -137,6 +137,7 @@ private struct TypingTab: View {
     @AppStorage("spellCheck") private var spellCheck = true
     @AppStorage("englishRestore") private var englishRestore = true
     @AppStorage("escRevert") private var escRevert = true
+    @AppStorage("backspaceResume") private var backspaceResume = true
 
     var body: some View {
         Form {
@@ -171,10 +172,15 @@ private struct TypingTab: View {
                              "Ngay sau một từ bị đổi (cả), bấm Esc để lấy lại car. Esc đó không đến được app; "
                                  + "bấm lần nữa nếu cần. Tắt nếu bạn dùng vim.")
                 }
+                Toggle(isOn: $backspaceResume) {
+                    Labelled("Xoá lùi để sửa từ vừa gõ",
+                             "Xoá dấu cách ngay sau một từ là gõ tiếp được từ đó: tiêng ⌫ s (VNI: 1) ra tiếng. "
+                                 + "Tắt nếu app tự sửa chữ khi bạn gõ dấu cách (autocorrect).")
+                }
             }
         }
         .formStyle(.grouped)
-        .frame(width: formWidth, height: 462)
+        .frame(width: formWidth, height: 538)
     }
 }
 

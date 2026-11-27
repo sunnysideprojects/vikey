@@ -81,6 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         keyTap.hotkey = settings.hotkey
         keyTap.englishRestore = settings.englishRestore
         keyTap.escRevert = settings.escRevert
+        keyTap.backspaceResume = settings.backspaceResume
         keyTap.browserFix = settings.browserFix
         keyTap.addressBarOnly = settings.addressBarOnly
         keyTap.slowApps = settings.slowApps

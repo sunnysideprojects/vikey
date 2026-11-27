@@ -16,6 +16,9 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   `Engine.swift` (per-word key processing, undo-by-repeat, English restore, backspace resync).
 - `Sources/ViKeyCore/Version.swift` — `AppVersion` (dotted numeric compare, `v` prefix, 1.2 == 1.2.0), used by the
   update check; Swift only, covered by the self-test.
+- `Sources/ViKeyCore/RecentText.swift` — text typed since the caret last moved, before the engine's word (finished
+  words + the space/punctuation after each, ≤ 120 chars, trimmed at a word start); KeyTap uses it to step back into
+  the previous word on backspace. Swift only; `typeLine` cases in the self-test check it stays equal to the screen.
 - `Sources/ViKeyCore/Macro.swift` — abbreviation table ("gõ tắt") in UniKey `ukmacro.txt` format (UTF-8/BOM/CRLF or
   UTF-16, `;` comment lines, `key:value`). Swift only, not in the Python reference.
 - `Sources/ViKeyCore/TextTools.swift` — `TextTool` conversions for the menu "Chuyển văn bản trong clipboard"
@@ -50,7 +53,7 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
 - `Sources/ViKeySelfTest/` — engine tests as an executable (no XCTest, works with Command Line Tools only); reads
   the engine cases from `reference/cases.tsv` at run time.
 - `reference/` — Python port of the engine (`engine.py`) + shared `cases.tsv`, `restore.tsv` (word-end restore,
-  column 4 = the one word the fake dictionary knows), `revert.tsv` (Esc revert) + `test_engine.py` (incl. 20k-word
+  column 4 = the one word the fake dictionary knows), `revert.tsv` (Esc revert), `resume.tsv` (resume an earlier word) + `test_engine.py` (incl. 20k-word
   backspace fuzz). The Swift engine mirrors it 1:1; keep them in sync when changing rules.
 
 ## Commands
@@ -119,6 +122,12 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   engine then stays inert (literal) until the word ends. Nothing to undo → Esc passes through, so a second Esc
   always reaches the app. Conflicts with vim's Esc in insert mode (tooltip says to turn it off).
   `Engine.revert()` / `revert`.
+- Backspace into the previous word (setting "Xoá lùi để sửa từ vừa gõ", key `backspaceResume`, default on, both
+  methods): with no word in progress, a backspace that deletes the space or punctuation right after a word hands
+  that word back to the engine (`RecentText.backspace` → `Engine.resume(word)`, state rebuilt from `synthKeys`;
+  words the keys cannot reproduce stay literal), so `tiêng␣` ⌫ `s` → `tiếng`. Several words back works too.
+  Space and punctuation keep the history; Return/Tab/Esc, clicks, arrows, ⌘⌃⌥ combos and app switches clear it.
+  Risk: an app that changes a word on space (autocorrect, text replacement) leaves the history stale.
 - `ư` + `o` auto-becomes `ươ`; a following `w`/`7` just confirms it (`uwow` → `ươ`). Open syllable `ươ` renders `uơ` (thuở).
 - Abbreviations: KeyTap tracks a token since the last whitespace/caret move (`tokenPrefix + engine.output`, plus the
   raw keys as a fallback match). Space/Return/Tab, or punctuation that does not extend any key, expands it; the
@@ -136,6 +145,7 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   revert; (v1.0.7) clipboard tools; (v1.0.8) fast-typing fallbacks (all off by default); (v1.0.9) Settings
   window + short menu. None of these confirmed by the user in real apps yet. (v1.0.10) stable self-signed
   signing; checked 2026-11-27 that a rebuild keeps the Accessibility grant (event tap enabled, no re-grant).
+- Built 2026-11-27, not released: backspace into the previous word (not tried by the user in real apps yet).
 - Fixed (user confirmed 2026-11-16): fast typing dropped text ("làm" → "lm"; after deleting and retyping → "a2a2" /
   "la2m"). User types VNI. Cause: synthetic text events used keycode 0 (= the A key, often still held when typing
   fast, so the app dropped them); now they reuse the keycode of the swallowed key. Also `engine.reset()` when the

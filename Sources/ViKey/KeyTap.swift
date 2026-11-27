@@ -45,6 +45,8 @@ final class KeyTap {
     var isWord: ((String) -> Bool)?
     /// Esc right after a converted word puts back the raw keys (`car` -> `cả` -> Esc -> `car`).
     var escRevert = true
+    /// Backspace over the space after a word picks the word up again (`tiêng ` ⌫ `s` -> `tiếng`).
+    var backspaceResume = true
 
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -57,6 +59,8 @@ final class KeyTap {
     /// Physical keys typed in the token (`ddc`), a fallback match when the screen text differs (`đc`).
     private var tokenKeys = ""
     private var tokenKeysValid = true
+    /// Finished words since the caret last moved, with the spaces and punctuation between them.
+    private var recent = RecentText()
 
     /// Whether the focused text field sits inside a web page (nil: not asked yet since the focus
     /// may have moved). Only used with `addressBarOnly`.
@@ -129,8 +133,16 @@ final class KeyTap {
 
         let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
         if keyCode == Self.backspaceKey {
-            // Let the app delete; just resync the engine (or the part of the token before it).
-            if !engine.backspace(), !tokenPrefix.isEmpty { tokenPrefix.removeLast() }
+            // Let the app delete; just resync the engine. With no word in progress the deleted
+            // character comes off the text before it, and deleting the space or punctuation right
+            // after a word makes that word the one in progress again.
+            if !engine.backspace() {
+                if !tokenPrefix.isEmpty { tokenPrefix.removeLast() }
+                if let word = recent.backspace(resume: backspaceResume) {
+                    engine.resume(word)
+                    tokenPrefix = tokenPrefix.hasSuffix(word) ? String(tokenPrefix.dropLast(word.count)) : ""
+                }
+            }
             tokenKeysValid = false
             return pass
         }
@@ -146,14 +158,7 @@ final class KeyTap {
             if ch == "\u{1B}", escRevert, revertWord(proxy: proxy) { return nil }
             if expandMacro(trigger: ch, event: event, keyCode: keyCode, proxy: proxy) { return nil }
             if restoreWord(trigger: ch, event: event, keyCode: keyCode, proxy: proxy) { return nil }
-            if Self.isTokenChar(ch) {
-                // Punctuation or a digit ends the engine word but not the token (`k0`, `9h`).
-                tokenPrefix += engine.output + String(ch)
-                tokenKeys.append(ch)
-                engine.reset()
-            } else {
-                resetWord()  // space, return, tab, escape: end of word
-            }
+            endWord(engine.output, with: ch)
             return pass
         }
 
@@ -166,12 +171,34 @@ final class KeyTap {
             ? pass : nil
     }
 
-    /// Forget the word being typed (caret moved, app switched, settings changed...).
+    /// Forget the word being typed and the text before it (caret moved, app switched, settings
+    /// changed...).
     func resetWord() {
         engine.reset()
         tokenPrefix = ""
         tokenKeys = ""
         tokenKeysValid = true
+        recent.clear()
+    }
+
+    /// `word` is on screen and `ch` (not an engine key) is being typed after it.
+    private func endWord(_ word: String, with ch: Character) {
+        if Self.isTokenChar(ch) {
+            // Punctuation or a digit ends the engine word but not the token (`k0`, `9h`).
+            engine.reset()
+            tokenPrefix += word + String(ch)
+            tokenKeys.append(ch)
+            recent.append(word + String(ch))
+        } else if ch == " " {
+            // Ends the token; the word stays reachable with backspace.
+            engine.reset()
+            tokenPrefix = ""
+            tokenKeys = ""
+            tokenKeysValid = true
+            recent.append(word + " ")
+        } else {
+            resetWord()  // Return, Tab, Esc: the caret may be somewhere else now
+        }
     }
 
     /// Visible, non-whitespace character that stays part of an abbreviation token.
@@ -196,7 +223,14 @@ final class KeyTap {
         }
         guard let expansion = macros.lookup(screen) ?? (tokenKeysValid ? macros.lookup(tokenKeys) : nil),
               expansion != screen else { return false }
+        // The expansion starts a fresh token, but stays in the recent text like any word.
+        recent.dropLast(tokenPrefix.count)
+        let history = recent
         resetWord()
+        if isText || ch == " " {
+            recent = history
+            recent.append(expansion + String(ch))
+        }
         // Return/Tab keycodes carry meaning (send, next field) in many apps: type text as Space.
         replace(old: screen, new: expansion, keyCode: isText || ch == " " ? keyCode : Self.spaceKey, proxy: proxy)
         if let copy = event.copy() {
@@ -225,13 +259,7 @@ final class KeyTap {
         guard isText || ch == " " || ch == "\r" || ch == "\t" || ch == "\u{3}" else { return false }
         let old = engine.output
         guard let raw = engine.restoreIfNotWord(isWord: isWord) else { return false }
-        if isText {
-            tokenPrefix += raw + String(ch)
-            tokenKeys.append(ch)
-            engine.reset()
-        } else {
-            resetWord()
-        }
+        endWord(raw, with: ch)
         // Same as abbreviations: Return/Tab keycodes carry meaning, so the text goes under Space.
         replace(old: old, new: raw, keyCode: isText || ch == " " ? keyCode : Self.spaceKey, proxy: proxy)
         if let copy = event.copy() {

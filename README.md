@@ -49,6 +49,7 @@ Sau đó:
 | Kiểu đặt dấu | cũ `hòa, thủy` (mặc định) hoặc mới `hoà, thuỷ` |
 | Khôi phục từ tiếng Anh | `windows`, `google`, `class`, `tesst` → `test`... không bị biến dấu |
 | Gõ lại để huỷ dấu | `ass` → as, `aaa` → aa, `ddd` → dd, `ww` → w |
+| Xoá lùi để sửa từ vừa gõ | gõ `tieeng` rồi dấu cách, xoá lùi một lần rồi gõ `s` → tiếng (VNI: `1`). Tắt được trong **Cài đặt → Gõ phím** |
 | Phím tắt `w` | `w` → ư, `uow`/`uwow` → ươ, `thuowr` → thuở |
 | Nhớ trạng thái theo app | ví dụ Terminal luôn E, Slack luôn V |
 | Sửa lỗi trình duyệt | thanh địa chỉ Chrome/Edge/Safari/Firefox/Arc/Dia/Brave/Zen/Opera/Vivaldi/Orion/DuckDuckGo/Comet/Cốc Cốc (cả bản beta/dev) không nuốt chữ vì autocomplete |
@@ -70,6 +71,7 @@ Sau đó:
 Sources/ViKeyCore/      engine thuần Swift, không phụ thuộc AppKit
   Vietnamese.swift      bảng nguyên âm/phụ âm, kiểm tra âm tiết hợp lệ, vị trí dấu, render
   Engine.swift          xử lý phím theo từ: dấu, mũ/móc, huỷ dấu, khôi phục, backspace
+  RecentText.swift      nhớ các từ vừa gõ để xoá lùi vào sửa tiếp
   Macro.swift           đọc bảng gõ tắt định dạng UniKey
   Version.swift         so sánh số phiên bản (kiểm tra cập nhật)
 Sources/ViKey/          app menu bar
