@@ -60,6 +60,11 @@ final class Settings {
         get { bool("spellCheck", true) }
         set { d.set(newValue, forKey: "spellCheck") }
     }
+    /// At word end, give back the keys of a Telex word the Vietnamese dictionary does not know.
+    var englishRestore: Bool {
+        get { bool("englishRestore", true) }
+        set { d.set(newValue, forKey: "englishRestore") }
+    }
     /// Remember on/off per application.
     var smartSwitch: Bool {
         get { bool("smartSwitch", true) }

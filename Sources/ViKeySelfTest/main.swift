@@ -29,6 +29,35 @@ for (m, modern, input, expected) in cases {
     }
 }
 
+// Word-end restore, shared with the Python reference: reference/restore.tsv
+// (method, modern 0/1, keys, the one word the dictionary knows or -, expected).
+let restoreText = (try? String(contentsOf: casesFile.deletingLastPathComponent()
+    .appendingPathComponent("restore.tsv"), encoding: .utf8)) ?? ""
+let restoreCases = restoreText.split(separator: "\n").map { $0.split(separator: "\t").map(String.init) }
+    .filter { $0.count == 5 }
+if restoreCases.isEmpty {
+    failures += 1
+    print("RESTORE FAIL: cannot read reference/restore.tsv")
+}
+for f in restoreCases {
+    let e = typeWord(f[2], method: InputMethod(rawValue: f[0])!, modern: f[1] == "1")
+    let got = e.restoreIfNotWord(isWord: { $0 == f[3] }) ?? e.output
+    if got != f[4] {
+        failures += 1
+        print("RESTORE FAIL [\(f[0])] \(f[2]) -> \(got) (expected \(f[4]))")
+    }
+}
+let candidates = Vietnamese.syllableCandidates()
+for w in ["khách", "ngày", "nghiêng", "thuở", "quýt", "gìn", "đồng", "khuỷu", "lă", "hòa", "thủy"]
+    where !candidates.contains(w) {
+    failures += 1
+    print("SYLLABLE FAIL: \(w) not among \(candidates.count) candidates")
+}
+for w in ["hoà", "thuỷ", "Việt", "zô", "ýe"] where candidates.contains(w) {
+    failures += 1
+    print("SYLLABLE FAIL: \(w) should not be a candidate")
+}
+
 // Backspace: delete n chars, keep typing, compare.
 let bsCases: [(String, Int, String, String)] = [
     ("tieengs", 1, "h", "tiếnh"),
@@ -148,7 +177,7 @@ for bad in ["", "v", "beta", "1..2", "1.x", "١.٢"] where v(bad) != nil {
 check("version description", v("v1.0.3")?.description, "1.0.3")
 
 if failures == 0 {
-    print("ViKey self-test: \(cases.count + bsCases.count) cases + fuzz OK")
+    print("ViKey self-test: \(cases.count + restoreCases.count + bsCases.count) cases + fuzz OK, \(candidates.count) syllable candidates")
 } else {
     print("ViKey self-test: \(failures) failure(s)")
     exit(1)

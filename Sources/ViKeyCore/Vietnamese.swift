@@ -13,7 +13,7 @@ struct Letter {
 typealias NucleusChar = (base: Character, mod: Mod)
 
 /// Vietnamese orthography tables and syllable rules.
-enum Vietnamese {
+public enum Vietnamese {
     static let vowels: Set<Character> = ["a", "e", "i", "o", "u", "y"]
 
     static let moddedVowels: [Character: NucleusChar] = [
@@ -130,6 +130,26 @@ extension Vietnamese {
         let pair = String([letters[g[0]].base, letters[g[1]].base])
         if modern && ["oa", "oe", "uy"].contains(pair) { return g[1] }
         return g[0]
+    }
+
+    /// Every complete syllable the rules allow (lowercase, old-style tone position), real or not:
+    /// about 32k. The app keeps the ones the system dictionary knows (about 6.7k).
+    public static func syllableCandidates() -> [String] {
+        var out = Set<String>()
+        let starts: [[Letter]] = initials.sorted().map { $0.map { Letter(base: $0) } }
+            + [Array("qu").map { Letter(base: $0) }, Array("gi").map { Letter(base: $0) }, [Letter(base: "d", mod: .stroke)]]
+        let rimes: [[Letter]] = nuclei.map { $0.map { Letter(base: $0.base, mod: $0.mod) } }
+            + finalNuclei.flatMap { n in finals.sorted().map { f in
+                n.map { Letter(base: $0.base, mod: $0.mod) } + f.map { Letter(base: $0) } } }
+        for s in starts {
+            for r in rimes {
+                let letters = s + r
+                for tone in 0..<6 where isValid(letters, tone: tone) {
+                    out.insert(render(letters, tone: tone, modern: false))
+                }
+            }
+        }
+        return out.sorted()
     }
 
     static func render(_ letters: [Letter], tone: Int, modern: Bool) -> String {

@@ -308,6 +308,20 @@ class Engine:
             self._append(ch)
         return self.output
 
+    def restore_if_not_word(self, is_word):
+        """At the end of a word: the raw keys if the engine made a Vietnamese-looking word that the
+        dictionary does not know (law -> lă -> law). is_word gets the lowercase old-style spelling."""
+        if self.method != "telex" or not self.spell_check or self.inert is not None:
+            return None
+        if not self.letters or not is_valid(self.letters, self.tone):
+            return None
+        out = self.output
+        raw = "".join(self.keys)
+        if out.isascii() or raw == out:
+            return None
+        plain = [Letter(l.base, l.mod) for l in self.letters]
+        return None if is_word(render(plain, self.tone, False)) else raw
+
     def backspace(self):
         text = self.output
         if not text:

@@ -7,6 +7,14 @@ for line in open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'cases.
     m,mod,inp,exp=line.rstrip('\n').split('\t')
     got=type_word(inp,method=m,modern=mod=='1')
     if got!=exp: fails+=1; print('FAIL',m,mod,inp,'->',got,'expected',exp)
+# word-end restore (restore.tsv: method, modern, keys, the one word the dictionary knows or -, expected)
+for line in open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'restore.tsv'),encoding='utf-8'):
+    if not line.strip(): continue
+    m,mod,inp,known,exp=line.rstrip('\n').split('\t')
+    e=Engine(method=m,modern=mod=='1')
+    for ch in inp: e.process(ch)
+    got=e.restore_if_not_word(lambda w: w==known) or e.output
+    if got!=exp: fails+=1; print('RESTORE FAIL',m,mod,inp,'->',got,'expected',exp)
 # backspace: type word, backspace, should equal output minus last char, then continue typing
 def bs(m,word,n,more,exp):
     global fails

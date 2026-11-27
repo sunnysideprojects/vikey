@@ -103,6 +103,19 @@ public final class Engine {
         return output
     }
 
+    /// At the end of a word: the raw keys if the engine made a Vietnamese-looking word that the
+    /// dictionary does not know (`law` -> `lă` -> `law`, `yes` -> `ýe` -> `yes`). Telex only: in VNI the
+    /// raw keys are digits. `isWord` gets the lowercase old-style spelling (`khỏe`, `thủy`, `hòa`).
+    public func restoreIfNotWord(isWord: (String) -> Bool) -> String? {
+        guard method == .telex, spellCheck, inert == nil, !letters.isEmpty,
+              Vietnamese.isValid(letters, tone: tone) else { return nil }
+        let out = output
+        let raw = String(keys)
+        guard out.unicodeScalars.contains(where: { !$0.isASCII }), raw != out else { return nil }
+        let plain = letters.map { Letter(base: $0.base, mod: $0.mod) }
+        return isWord(Vietnamese.render(plain, tone: tone, modern: false)) ? nil : raw
+    }
+
     /// The app already deleted one character on screen; rebuild state for the shorter text.
     /// Returns false when no word was in progress.
     @discardableResult

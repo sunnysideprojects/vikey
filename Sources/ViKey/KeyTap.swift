@@ -32,6 +32,9 @@ final class KeyTap {
     var onToggle: (() -> Void)?
     var macros = MacroTable()
     var macroEnabled = true
+    /// Word-end restore of English words that came out as non-words (`law` -> `lă` -> `law`).
+    var englishRestore = true
+    var isWord: ((String) -> Bool)?
 
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -120,6 +123,7 @@ final class KeyTap {
         }
         if !isEngineKey(ch) {
             if expandMacro(trigger: ch, event: event, keyCode: keyCode, proxy: proxy) { return nil }
+            if restoreWord(trigger: ch, event: event, keyCode: keyCode, proxy: proxy) { return nil }
             if Self.isTokenChar(ch) {
                 // Punctuation or a digit ends the engine word but not the token (`k0`, `9h`).
                 tokenPrefix += engine.output + String(ch)
@@ -172,6 +176,30 @@ final class KeyTap {
         resetWord()
         // Return/Tab keycodes carry meaning (send, next field) in many apps: type text as Space.
         replace(old: screen, new: expansion, keyCode: isText || ch == " " ? keyCode : Self.spaceKey, proxy: proxy)
+        if let copy = event.copy() {
+            copy.setIntegerValueField(.eventSourceUserData, value: Self.syntheticMarker)
+            copy.tapPostEvent(proxy)
+        }
+        return true
+    }
+
+    /// `ch` ends the word (whitespace or punctuation): if the engine turned it into something the
+    /// dictionary does not know, put the raw keys back, then retype the trigger key itself.
+    private func restoreWord(trigger ch: Character, event: CGEvent, keyCode: CGKeyCode, proxy: CGEventTapProxy) -> Bool {
+        guard englishRestore, let isWord else { return false }
+        let isText = Self.isTokenChar(ch)
+        guard isText || ch == " " || ch == "\r" || ch == "\t" || ch == "\u{3}" else { return false }
+        let old = engine.output
+        guard let raw = engine.restoreIfNotWord(isWord: isWord) else { return false }
+        if isText {
+            tokenPrefix += raw + String(ch)
+            tokenKeys.append(ch)
+            engine.reset()
+        } else {
+            resetWord()
+        }
+        // Same as abbreviations: Return/Tab keycodes carry meaning, so the text goes under Space.
+        replace(old: old, new: raw, keyCode: isText || ch == " " ? keyCode : Self.spaceKey, proxy: proxy)
         if let copy = event.copy() {
             copy.setIntegerValueField(.eventSourceUserData, value: Self.syntheticMarker)
             copy.tapPostEvent(proxy)

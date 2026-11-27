@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var keyTap: KeyTap!
     private var permissionTimer: Timer?
     private let macroFile = MacroFile()
+    private let lexicon = VietnameseLexicon()
     private let secureInput = SecureInputMonitor()
     private let updates = UpdateChecker(
         currentVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
@@ -23,6 +24,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         keyTap.frontBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         keyTap.onToggle = { [weak self] in self?.toggle() }
         keyTap.macroEnabled = settings.macroEnabled
+        keyTap.englishRestore = settings.englishRestore
+        keyTap.isWord = { [lexicon] in lexicon.contains($0) }
+        lexicon.load()
         macroFile.onChange = { [weak self] table in
             guard let self else { return }
             if let table { self.keyTap.macros = table }
@@ -169,6 +173,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         menu.addItem(item("Đặt dấu kiểu mới (oà, uý)", #selector(toggleModern), checked: settings.modernTone))
         menu.addItem(item("Kiểm tra chính tả, khôi phục từ tiếng Anh", #selector(toggleSpell), checked: settings.spellCheck))
+        let restore = item("Trả lại từ không có trong từ điển (law, yes, more)", #selector(toggleEnglishRestore),
+                           checked: settings.englishRestore)
+        restore.indentationLevel = 1
+        restore.toolTip = "Khi gõ Telex và hết từ, nếu từ vừa gõ thành chữ không có trong từ điển tiếng Việt "
+            + "của macOS (lă, ýe, mỏe) thì ViKey trả lại đúng các phím đã gõ. Cần bật kiểm tra chính tả."
+        menu.addItem(restore)
         menu.addItem(item("Nhớ Việt/Anh theo từng ứng dụng", #selector(toggleSmart), checked: settings.smartSwitch))
         menu.addItem(item("Sửa lỗi gợi ý trên thanh địa chỉ trình duyệt", #selector(toggleBrowserFix), checked: settings.browserFix))
 
@@ -290,6 +300,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings.spellCheck.toggle()
         engine.spellCheck = settings.spellCheck
         keyTap.resetWord()
+        refreshUI()
+    }
+
+    @objc private func toggleEnglishRestore() {
+        settings.englishRestore.toggle()
+        keyTap.englishRestore = settings.englishRestore
         refreshUI()
     }
 

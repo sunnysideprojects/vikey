@@ -18,7 +18,10 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   update check; Swift only, covered by the self-test.
 - `Sources/ViKeyCore/Macro.swift` — abbreviation table ("gõ tắt") in UniKey `ukmacro.txt` format (UTF-8/BOM/CRLF or
   UTF-16, `;` comment lines, `key:value`). Swift only, not in the Python reference.
-- `Sources/ViKey/` — `KeyTap.swift` (event tap + output), `AppDelegate.swift` (menu, Accessibility, per-app state),
+- `Sources/ViKey/` — `KeyTap.swift` (event tap + output), `Lexicon.swift` (real Vietnamese syllables for the
+  word-end English restore: checks all ~32k `Vietnamese.syllableCandidates()` once with `NSSpellChecker` "vi" in
+  50-word main-thread batches, ~9 s, keeps ~6.7k, caches `~/Library/Application Support/ViKey/syllables.txt` keyed
+  by macOS version; until ready or if the count looks wrong every word counts as real = no restore), `AppDelegate.swift` (menu, Accessibility, per-app state),
   `Settings.swift` (UserDefaults), `MacroFile.swift` (polls the chosen ukmacro.txt every 3 s off the main thread,
   read-only, so it can sit in Google Drive and be shared with UniKey on Windows), `SecureInput.swift` (polls
   `IsSecureEventInputEnabled` every 1 s; holder app from the session's `kCGSSessionSecureInputPID`, which names
@@ -36,7 +39,8 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
 - `docs/` — README images only: `vikey-icon.png` (logo), `screenshot.png` (menu + About window).
 - `Sources/ViKeySelfTest/` — engine tests as an executable (no XCTest, works with Command Line Tools only); reads
   the engine cases from `reference/cases.tsv` at run time.
-- `reference/` — Python port of the engine (`engine.py`) + shared `cases.tsv` + `test_engine.py` (incl. 20k-word
+- `reference/` — Python port of the engine (`engine.py`) + shared `cases.tsv`, `restore.tsv` (word-end restore,
+  column 4 = the one word the fake dictionary knows) + `test_engine.py` (incl. 20k-word
   backspace fuzz). The Swift engine mirrors it 1:1; keep them in sync when changing rules.
 
 ## Commands
@@ -79,6 +83,11 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
 ## Engine rules worth knowing
 - Spell check on: a transform is applied only if the result stays a valid Vietnamese syllable prefix; if the word is
   invalid, output = raw keys minus "undo" keys (`tesst` → `test`, `windows` stays `windows`).
+- Word-end restore (Telex only, menu "Trả lại từ không có trong từ điển", default on, needs spell check): on
+  space/Return/Tab/punctuation, if the output has diacritics and its lowercase old-style spelling is not a real
+  syllable, KeyTap retypes the raw keys (`law`→`lă`→`law`, `yes`, `more`, `door`). Real words stay (`car`→`cả`,
+  `sex`→`sẽ`). Doubled-letter words still need a third letter (`bosss`→`boss`): `ass`→`as` and `tesst`→`test` win.
+  `Engine.restoreIfNotWord(isWord:)` / `restore_if_not_word`.
 - Repeat a mark key to undo it and type it literally (`ass` → `as`, `aaa` → `aa`).
 - `ư` + `o` auto-becomes `ươ`; a following `w`/`7` just confirms it (`uwow` → `ươ`). Open syllable `ươ` renders `uơ` (thuở).
 - Abbreviations: KeyTap tracks a token since the last whitespace/caret move (`tokenPrefix + engine.output`, plus the
