@@ -28,3 +28,6 @@ Not covered by the MIT licence:
 - Resources/ssp-app-icon.png: the Sunny Side Projects name and logo are
   © 2026 Nhat (@nhatnx), all rights reserved; see
   https://github.com/sunnysideprojects/brand/blob/main/LICENSE.md.
+- Sparkle.framework (bundled in the app, fetched by SwiftPM): Sparkle's own MIT
+  licence and notices, copied into the app as
+  Contents/Resources/LICENSE-Sparkle.txt.

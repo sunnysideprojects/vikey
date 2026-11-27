@@ -19,10 +19,21 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/ViKey"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns Resources/ssp-app-icon.png Resources/BricolageGrotesque-Variable.ttf Resources/OFL-BricolageGrotesque.txt "$APP/Contents/Resources/"
+# Sparkle (in-app updates). ViKey is not sandboxed, so Sparkle's XPC services are not needed.
+mkdir -p "$APP/Contents/Frameworks"
+ditto "$(dirname "$BIN")/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
+SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
+rm -rf "$SPARKLE/XPCServices" "$SPARKLE/Versions/B/XPCServices"
+cp .build/artifacts/sparkle/Sparkle/LICENSE "$APP/Contents/Resources/LICENSE-Sparkle.txt"
 # Sign with ViKey's own certificate (scripts/make-signing-cert.sh) so the Accessibility grant survives
 # rebuilds and updates. Without it (CI, other Macs) fall back to ad-hoc, which changes every build.
 # VIKEY_SIGN_IDENTITY overrides the identity (its SHA-1; "-" forces ad-hoc).
 IDENTITY="${VIKEY_SIGN_IDENTITY:-$(security find-identity -p codesigning 2>/dev/null | grep -F '"ViKey Code Signing"' | awk '{ print $2; exit }' || true)}"
+# Inside out: Sparkle's helpers, the framework, then the app. Sparkle refuses an update whose
+# signature does not match the running app, so all of it carries the same identity.
+for code in "$SPARKLE/Versions/B/Autoupdate" "$SPARKLE/Versions/B/Updater.app" "$SPARKLE"; do
+  codesign --force --sign "${IDENTITY:--}" --preserve-metadata=entitlements "$code"
+done
 codesign --force --sign "${IDENTITY:--}" "$APP"
 if [[ "${IDENTITY:--}" == "-" ]]; then
   echo "✓ $APP (ad-hoc signature: Accessibility must be granted again after every build)"

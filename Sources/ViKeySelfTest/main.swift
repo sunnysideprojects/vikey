@@ -274,27 +274,6 @@ for (tool, input, expected) in toolCases {
     }
 }
 
-// MARK: - Versions (update check)
-
-func v(_ s: String) -> AppVersion? { AppVersion(s) }
-let newer: [(String, String)] = [("1.0.4", "1.0.3"), ("v1.0.10", "1.0.9"), ("2", "1.9.9"), ("1.1", "1.0.99"),
-                                 ("1.0.0.1", "1.0")]
-for (a, b) in newer {
-    if let x = v(a), let y = v(b), x > y, !(y > x) { continue }
-    failures += 1
-    print("VERSION FAIL: expected \(a) > \(b)")
-}
-for (a, b) in [("1.0.3", "v1.0.3"), ("1.2", "1.2.0"), ("1.2.3-beta", "1.2.3"), (" v2.0 ", "2")] {
-    if v(a) != nil, v(a) == v(b), !(v(a)! < v(b)!), !(v(b)! < v(a)!) { continue }
-    failures += 1
-    print("VERSION FAIL: expected \(a) == \(b)")
-}
-for bad in ["", "v", "beta", "1..2", "1.x", "١.٢"] where v(bad) != nil {
-    failures += 1
-    print("VERSION FAIL: '\(bad)' should not parse")
-}
-check("version description", v("v1.0.3")?.description, "1.0.3")
-
 let caseCounts: [Int] = [cases.count, restoreCases.count, revertCases.count, resumeCases.count, bsCases.count,
                          lineCases.count, toolCases.count]
 if failures == 0 {

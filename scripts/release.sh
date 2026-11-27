@@ -26,6 +26,9 @@ TAG="v$VERSION"
 PLIST=Resources/Info.plist
 ZIP="dist/ViKey-$VERSION.zip"
 NOTES="dist/notes-$VERSION.md"
+APPCAST=dist/appcast.xml
+REPO_URL=https://github.com/sunnysideprojects/vikey
+SPARKLE_BIN=.build/artifacts/sparkle/Sparkle/bin
 pb() { /usr/libexec/PlistBuddy -c "$1" "$PLIST"; }
 # Releases must be signed with ViKey's own certificate (scripts/make-signing-cert.sh), so users keep
 # their Accessibility grant across updates. Changing this pin means every user re-grants once.
@@ -43,6 +46,12 @@ git rev-parse -q --verify "refs/tags/$TAG" >/dev/null && die "tag $TAG already e
 $DRY_RUN || ! gh release view "$TAG" >/dev/null 2>&1 || die "GitHub release $TAG already exists"
 security find-identity -p codesigning | grep -q "$SIGNING_CERT_SHA1" \
   || die "signing certificate $SIGNING_CERT_SHA1 is not in the keychain (restore the .p12 backup)"
+# Sparkle update key (generate_keys --account vikey): its public half must be the one in Info.plist,
+# or every installed copy would reject the update.
+swift package resolve >/dev/null
+ED_KEY="$("$SPARKLE_BIN/generate_keys" --account vikey -p 2>/dev/null || true)"
+[[ -n "$ED_KEY" && "$ED_KEY" == "$(pb 'Print :SUPublicEDKey')" ]] \
+  || die "Sparkle key 'vikey' is missing from the keychain or does not match SUPublicEDKey (restore it with generate_keys --account vikey -f <backup>)"
 
 CURRENT="$(pb 'Print :CFBundleShortVersionString')"
 BUILD="$(pb 'Print :CFBundleVersion')"
@@ -76,6 +85,15 @@ ditto -c -k --keepParent build/ViKey.app "$ZIP"
 SHA="$(shasum -a 256 "$ZIP" | awk '{print $1}')"
 echo "  $ZIP  $SHA"
 
+echo "▸ Appcast"
+ENCLOSURE="$("$SPARKLE_BIN/sign_update" --account vikey "$ZIP")"
+"$SPARKLE_BIN/sign_update" --account vikey --verify "$ZIP" "$(sed -E 's/.*edSignature="([^"]+)".*/\1/' <<<"$ENCLOSURE")" \
+  || die "the zip's Sparkle signature does not verify"
+python3 scripts/appcast.py "$VERSION" "$NEW_BUILD" "$REPO_URL/releases/download/$TAG/ViKey-$VERSION.zip" \
+  "$REPO_URL/releases/tag/$TAG" "$CHANGES" "$ENCLOSURE" > "$APPCAST"
+xmllint --noout "$APPCAST" || die "$APPCAST is not valid XML"
+echo "  $APPCAST"
+
 # MARK: Notes
 {
   cat "$CHANGES"
@@ -90,6 +108,8 @@ echo "  $ZIP  $SHA"
 3. Cấp quyền **Accessibility** khi được hỏi (System Settings → Privacy & Security → Accessibility). Nếu nâng cấp từ bản 1.0.9 trở về trước (ký ad-hoc) thì cần xoá ViKey khỏi danh sách Accessibility rồi bật lại một lần; các bản cập nhật sau giữ nguyên quyền.
 4. Gỡ bộ gõ "Vietnamese" của macOS, chỉ giữ **ABC**.
 
+Đang dùng bản mới hơn 1.0.11 thì không cần các bước trên: ViKey tự báo bản mới trong menu và cài bằng một nút bấm (hoặc chọn **Kiểm tra cập nhật…**).
+
 Universal: Apple Silicon và Intel.
 
 SHA-256 \`ViKey-$VERSION.zip\`: \`$SHA\`
@@ -102,7 +122,7 @@ EOF
 echo "  $NOTES"
 
 if $DRY_RUN; then
-  echo "✓ Dry run: $ZIP and $NOTES are ready; Info.plist restored, nothing committed or pushed."
+  echo "✓ Dry run: $ZIP, $NOTES and $APPCAST are ready; Info.plist restored, nothing committed or pushed."
   exit 0
 fi
 
@@ -115,9 +135,12 @@ git push -q origin main
 COMMIT="$(git rev-parse HEAD)"
 
 echo "▸ GitHub release"
-gh release create "$TAG" "$ZIP" --target "$COMMIT" --title "ViKey $VERSION" --notes-file "$NOTES"
+gh release create "$TAG" "$ZIP" "$APPCAST" --target "$COMMIT" --title "ViKey $VERSION" --notes-file "$NOTES"
 git fetch -q origin --tags
 [[ "$(git rev-parse "$TAG^{commit}")" == "$COMMIT" ]] || die "tag $TAG does not point at $COMMIT"
 LATEST="$(gh api "repos/{owner}/{repo}/releases/latest" -q .tag_name)"
 [[ "$LATEST" == "$TAG" ]] || echo "⚠️  GitHub's latest release is $LATEST, not $TAG"
+FEED="$(curl -fsSL "$REPO_URL/releases/latest/download/appcast.xml" || true)"
+grep -q "<sparkle:version>$NEW_BUILD</sparkle:version>" <<<"$FEED" \
+  || echo "⚠️  $REPO_URL/releases/latest/download/appcast.xml does not offer build $NEW_BUILD yet"
 echo "✓ Released $TAG: $(gh release view "$TAG" --json url -q .url)"

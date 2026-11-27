@@ -57,7 +57,7 @@ Sau đó:
 | Gõ tắt | dùng chung file `ukmacro.txt` với UniKey (để trên Google Drive được), tự nạp lại khi file đổi |
 | Khởi động cùng macOS | qua `SMAppService` |
 | Cài đặt | menu **Cài đặt…** (⌘,): các tab Gõ phím, Gõ tắt, Tương thích, Chung. Menu chỉ còn bật/tắt, Telex/VNI và công cụ clipboard |
-| Kiểm tra cập nhật | menu **Kiểm tra cập nhật…**, và tự hỏi GitHub mỗi ngày một lần (tắt được trong **Cài đặt → Chung**). Chỉ đọc số phiên bản mới nhất, không gửi dữ liệu gì, không tự tải hay cài |
+| Tự cập nhật | qua [Sparkle](https://sparkle-project.org): mỗi ngày kiểm tra một lần (tắt được trong **Cài đặt → Chung**), có bản mới thì menu hiện một dòng; cài bằng một nút bấm, ViKey tự mở lại và giữ quyền Accessibility. Bản cập nhật phải có chữ ký EdDSA của ViKey và cùng chữ ký code với bản đang chạy. Không gửi dữ liệu gì ngoài yêu cầu tải `appcast.xml` |
 
 ### Telex
 `s` sắc · `f` huyền · `r` hỏi · `x` ngã · `j` nặng · `z` xoá dấu · `aa` â · `ee` ê · `oo` ô · `aw` ă · `ow` ơ · `uw`/`w` ư · `dd` đ
@@ -73,20 +73,19 @@ Sources/ViKeyCore/      engine thuần Swift, không phụ thuộc AppKit
   Engine.swift          xử lý phím theo từ: dấu, mũ/móc, huỷ dấu, khôi phục, backspace
   RecentText.swift      nhớ các từ vừa gõ để xoá lùi vào sửa tiếp
   Macro.swift           đọc bảng gõ tắt định dạng UniKey
-  Version.swift         so sánh số phiên bản (kiểm tra cập nhật)
 Sources/ViKey/          app menu bar
   KeyTap.swift          CGEventTap: bắt phím, diff output, gửi backspace + Unicode
   AppDelegate.swift     menu, quyền Accessibility, nhớ trạng thái theo app
   Settings.swift        UserDefaults
   MacroFile.swift       theo dõi file ukmacro.txt (gõ tắt)
   SecureInput.swift     phát hiện Secure Input để báo trên menu bar
-  UpdateChecker.swift   hỏi GitHub bản phát hành mới nhất
+  Updater.swift         tự cập nhật bằng Sparkle
   SettingsWindow.swift  cửa sổ Cài đặt
   AboutWindow.swift     cửa sổ Giới thiệu
 Sources/ViKeySelfTest/  test engine (build.sh chạy trước khi build)
 Resources/              Info.plist, AppIcon.icns, logo + font brand
 scripts/                vẽ lại icon app (build-icon.sh), đóng khung ảnh chụp màn hình (frame-screenshots.swift),
-                        tạo chứng chỉ ký (make-signing-cert.sh), phát hành (release.sh),
+                        tạo chứng chỉ ký (make-signing-cert.sh), phát hành (release.sh, appcast.py),
                         test gõ phím thật qua ViKey (typing-test.sh + typing-cases.tsv)
 docs/                   logo và ảnh chụp màn hình dùng trong README
 reference/              bản engine Python tương đương + cases.tsv dùng chung

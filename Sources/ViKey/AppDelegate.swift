@@ -13,11 +13,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let lexicon = VietnameseLexicon()
     private let secureInput = SecureInputMonitor()
     private let settingsState = SettingsState()
-    private var autoUpdateRunning = false
     /// A typing test (test build only) owns the engine settings: stored preferences stay unapplied.
     private var testing = false
-    private let updates = UpdateChecker(
-        currentVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
+    private let updater = Updater()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         engine = Engine(method: settings.method, modernTone: settings.modernTone, spellCheck: settings.spellCheck)
@@ -31,7 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let table { self.keyTap.macros = table }
             self.refreshUI()
         }
-        updates.onChange = { [weak self] in self?.refreshUI() }
+        updater.onChange = { [weak self] in self?.refreshUI() }
         wireSettingsWindow()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -57,11 +55,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if CommandLine.arguments.contains("--about") { AboutWindow.show() }
         // `--settings`: open the settings window at launch.
         if CommandLine.arguments.contains("--settings") { showSettings() }
-        // `--check-update`: run the manual check at launch (for checking the dialog).
-        if CommandLine.arguments.contains("--check-update") { checkForUpdates() }
         #if TYPING_TEST
         if let options = TypingTest.options(from: CommandLine.arguments) { runTypingTest(options) }
         #endif
+        // Never in the typing test: its throwaway bundle must not update itself.
+        if !testing {
+            updater.start()
+            updater.automaticallyChecks = settings.autoUpdateCheck
+        }
+        // `--check-update`: run the manual check at launch (for checking the dialog).
+        if CommandLine.arguments.contains("--check-update") { checkForUpdates() }
     }
 
     #if TYPING_TEST
@@ -117,10 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if macroFile.url?.path != settings.macroPath {
             macroFile.watch(settings.macroPath.map { URL(fileURLWithPath: $0) })
         }
-        if settings.autoUpdateCheck != autoUpdateRunning {
-            autoUpdateRunning = settings.autoUpdateCheck
-            if autoUpdateRunning { updates.startAutomatic() } else { updates.stopAutomatic() }
-        }
+        updater.automaticallyChecks = settings.autoUpdateCheck
         refreshUI()
     }
 
@@ -229,10 +229,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 + "bộ gõ nào nhận phím. ViKey tự chạy lại khi nó tắt."
             menu.addItem(info)
         }
-        if let release = updates.available {
-            menu.addItem(item("⬆️ Đã có ViKey \(release.version) — mở trang tải về…", #selector(openReleasePage)))
+        if let version = updater.pendingVersion {
+            menu.addItem(item("⬆️ Đã có ViKey \(version) — cập nhật…", #selector(checkForUpdates)))
         }
-        if secureInput.isOn || updates.available != nil { menu.addItem(.separator()) }
+        if secureInput.isOn || updater.pendingVersion != nil { menu.addItem(.separator()) }
         menu.addItem(item("Gõ tiếng Việt (\(settings.hotkey.symbol))", #selector(menuToggle), checked: settings.enabled))
         menu.addItem(.separator())
         menu.addItem(item("Telex", #selector(chooseTelex), checked: settings.method == .telex))
@@ -362,34 +362,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Updates
 
-    @objc private func openReleasePage() {
-        NSWorkspace.shared.open(updates.available?.page ?? UpdateChecker.releasesPage)
-    }
-
     @objc private func checkForUpdates() {
-        updates.check { [weak self] outcome in
-            let alert = NSAlert()
-            switch outcome {
-            case .available(let release):
-                alert.messageText = "Đã có ViKey \(release.version)"
-                alert.informativeText = "Bạn đang dùng bản \(self?.updates.current?.description ?? "?"). "
-                    + "Tải file zip trên trang phát hành, giải nén rồi thay ViKey.app trong Applications. "
-                    + "Sau khi thay, bật lại quyền Accessibility cho ViKey."
-                alert.addButton(withTitle: "Mở trang tải về")
-                alert.addButton(withTitle: "Để sau")
-            case .upToDate(let current):
-                alert.messageText = "ViKey đã là bản mới nhất"
-                alert.informativeText = "Phiên bản \(current)."
-            case .failed(let reason):
-                alert.alertStyle = .warning
-                alert.messageText = "Không kiểm tra được cập nhật"
-                alert.informativeText = reason
-            }
-            NSApp.activate(ignoringOtherApps: true)
-            if alert.runModal() == .alertFirstButtonReturn, case .available(let release) = outcome {
-                NSWorkspace.shared.open(release.page)
-            }
-        }
+        updater.checkForUpdates()
     }
 
     @objc private func showAbout() { AboutWindow.show() }

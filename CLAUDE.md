@@ -14,8 +14,6 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
 ## Layout
 - `Sources/ViKeyCore/` — pure engine, no AppKit. `Vietnamese.swift` (syllable validity, tone placement, render),
   `Engine.swift` (per-word key processing, undo-by-repeat, English restore, backspace resync).
-- `Sources/ViKeyCore/Version.swift` — `AppVersion` (dotted numeric compare, `v` prefix, 1.2 == 1.2.0), used by the
-  update check; Swift only, covered by the self-test.
 - `Sources/ViKeyCore/RecentText.swift` — text typed since the caret last moved, before the engine's word (finished
   words + the space/punctuation after each, ≤ 120 chars, trimmed at a word start); KeyTap uses it to step back into
   the previous word on backspace. Swift only; `typeLine` cases in the self-test check it stays equal to the screen.
@@ -38,18 +36,18 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   `Settings.swift` (UserDefaults), `MacroFile.swift` (polls the chosen ukmacro.txt every 3 s off the main thread,
   read-only, so it can sit in Google Drive and be shared with UniKey on Windows), `SecureInput.swift` (polls
   `IsSecureEventInputEnabled` every 1 s; holder app from the session's `kCGSSessionSecureInputPID`, which names
-  the responsible GUI app; menu bar shows a lock + greyed letter and a menu line), `UpdateChecker.swift` (GET
-  `api.github.com/repos/sunnysideprojects/vikey/releases/latest`, compares `tag_name` with CFBundleShortVersionString;
-  menu "Kiểm tra cập nhật…" shows an alert, auto check 20 s after launch then daily unless "Tự kiểm tra cập nhật"
-  is off, a newer release adds a top menu line that opens the release page; never downloads or installs; `--check-update`
-  launch arg runs the manual check), `AboutWindow.swift` ("Giới thiệu
+  the responsible GUI app; menu bar shows a lock + greyed letter and a menu line), `Updater.swift` (Sparkle 2,
+  see Repo and releases; `SPUStandardUpdaterController`, daily automatic checks unless "Tự kiểm tra cập nhật" is
+  off; "gentle reminders": an update found in the background adds a top menu line instead of a window, choosing it
+  or "Kiểm tra cập nhật…" opens Sparkle's window; only started from an .app bundle and never in the typing test;
+  `--check-update` launch arg runs the manual check), `AboutWindow.swift` ("Giới thiệu
   ViKey", Sunny Side Projects brand: tokens, Bricolage Grotesque, endorsement line; `--about` launch arg opens it),
   `ViKeyApp.swift` (@main), `TypingTest.swift` (end-to-end typing test, only compiled with `-DTYPING_TEST`, see
   Commands).
 - `Resources/` — Info.plist, `AppIcon.icns`, the SSP logo and Bricolage font (OFL), copied into Contents/Resources by
   build.sh. Brand source: ~/Documents/Workplace/SSP/brand (BRAND-BOOK.md, tokens/tokens.json).
 - `scripts/` — `build-icon.sh` + `make-icon.swift` (app icon), `frame-screenshots.swift` (README screenshot),
-  `make-signing-cert.sh` (one-time signing certificate, see Repo and releases), `release.sh` (GitHub release, see below),
+  `make-signing-cert.sh` (one-time signing certificate, see Repo and releases), `release.sh` + `appcast.py` (GitHub release and Sparkle feed, see below),
   `typing-test.sh` + `typing-cases.tsv` (end-to-end typing test).
 - `docs/` — README images only: `vikey-icon.png` (logo), `screenshot.png` (menu + About window).
 - `Sources/ViKeySelfTest/` — engine tests as an executable (no XCTest, works with Command Line Tools only); reads
@@ -110,6 +108,21 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   `releases/latest`. Info.plist is restored on any failure before the commit. Do a `--dry-run` first (no git or
   GitHub changes) and show the notes. The script refuses to build unless the keychain has the pinned certificate
   (`SIGNING_CERT_SHA1`) and checks the built app's requirement names it.
+- In-app updates (Sparkle 2.10.1, SwiftPM, pinned exact; Package.resolved committed): build.sh copies
+  `Sparkle.framework` into Contents/Frameworks (rpath `@executable_path/../Frameworks` from Package.swift linker
+  flags), drops its XPC services (ViKey is not sandboxed) and signs Autoupdate, Updater.app, the framework and the app
+  with the same identity (Sparkle rejects an update whose code signature does not match the running app). Feed:
+  `SUFeedURL` = `/releases/latest/download/appcast.xml`, an asset of each release, holding only that release
+  (`scripts/appcast.py` writes it from changes.md; notes as HTML). Update key: EdDSA, keychain account `vikey`
+  (`generate_keys --account vikey`, created 2026-11-28), public key in `SUPublicEDKey`; release.sh checks the keychain
+  key matches it, signs the zip with `sign_update --account vikey`, verifies, uploads appcast.xml with the zip, then
+  checks the live feed offers the new build. Losing the key means installed copies cannot be updated in-app (users
+  reinstall by hand once with a new key). Info.plist declares `vi` only (`CFBundleDevelopmentRegion`,
+  `CFBundleLocalizations`), so Sparkle's window and system panels use Vietnamese. Tested 2026-11-28 with a local feed
+  (`defaults write dev.sunnysideprojects.vikey SUFeedURL http://127.0.0.1:8765/appcast.xml` + `python3 -m
+  http.server`; remove the default afterwards): 1.0.11 → 1.0.99 installed and relaunched, signature kept, no
+  quarantine, event tap running without re-granting. The first try failed with "error extracting the archive":
+  the disk was full. Releases ≤ v1.0.11 have no Sparkle and no appcast; the first release after it starts the feed.
 - CI: `.github/workflows/ci.yml` on push to main / PRs (macos-latest): Python reference tests, build.sh, bundle checks.
 - Signing (since v1.0.10, 2026-11-27): self-signed "ViKey Code Signing" certificate in the user's
   login keychain (RSA 3072, 20 years, SHA-1 19FE4391…F8D4), created by `scripts/make-signing-cert.sh`. Designated
@@ -160,6 +173,7 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   window + short menu. None of these confirmed by the user in real apps yet. (v1.0.10) stable self-signed
   signing; checked 2026-11-27 that a rebuild keeps the Accessibility grant (event tap enabled, no re-grant).
 - Shipped 2026-11-28 (v1.0.11): backspace into the previous word (not tried by the user in real apps yet).
+- Built 2026-11-28, not released: Sparkle in-app updates (the user clicked Install in the local-feed test).
 - Built 2026-11-28: end-to-end typing test; 39 cases pass in its own window (8 ms and 0 ms between keys) and in
   TextEdit. Not run against Chrome/Electron apps yet (the fast-typing bugs were there).
 - Fixed (user confirmed 2026-11-16): fast typing dropped text ("làm" → "lm"; after deleting and retyping → "a2a2" /

@@ -354,7 +354,9 @@ private struct GeneralTab: View {
             Section {
                 Toggle("Khởi động cùng macOS", isOn: Binding(get: { state.loginEnabled }, set: { state.setLogin($0) }))
                 Toggle(isOn: $autoUpdateCheck) {
-                    Labelled("Tự kiểm tra cập nhật", "Hỏi GitHub mỗi ngày một lần. ViKey không tự tải hay cài.")
+                    Labelled("Tự kiểm tra cập nhật",
+                             "Mỗi ngày một lần. Có bản mới thì menu hiện một dòng; cài bằng một nút bấm, "
+                                 + "giữ nguyên quyền Accessibility.")
                 }
                 LabeledContent("Phiên bản \(version)") {
                     Button("Kiểm tra ngay…") { state.checkForUpdates() }

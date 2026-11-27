@@ -54,6 +54,11 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/ViKey"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/"
+# The binary links Sparkle (the updater itself never starts in the test build).
+mkdir -p "$APP/Contents/Frameworks"
+ditto "$(dirname "$BIN")/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
+rm -rf "$APP/Contents/Frameworks/Sparkle.framework/XPCServices" "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices"
+codesign --force --sign "$IDENTITY" "$APP/Contents/Frameworks/Sparkle.framework" 2>/dev/null
 codesign --force --sign "$IDENTITY" "$APP" 2>/dev/null
 
 echo "▸ Run $CASES (hands off the keyboard and mouse)"
