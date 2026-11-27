@@ -65,6 +65,11 @@ final class Settings {
         get { bool("englishRestore", true) }
         set { d.set(newValue, forKey: "englishRestore") }
     }
+    /// Esc right after a converted word gives back the keys that were typed.
+    var escRevert: Bool {
+        get { bool("escRevert", true) }
+        set { d.set(newValue, forKey: "escRevert") }
+    }
     /// Remember on/off per application.
     var smartSwitch: Bool {
         get { bool("smartSwitch", true) }

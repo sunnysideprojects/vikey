@@ -308,6 +308,18 @@ class Engine:
             self._append(ch)
         return self.output
 
+    def revert(self):
+        """Esc: give back the raw keys of the word being typed (car -> cả -> car), then type
+        literally until reset. None when there is nothing to undo."""
+        if self.inert is not None or not self.keys:
+            return None
+        raw = "".join(self.keys)
+        if raw == self.output:
+            return None
+        self.reset()
+        self.inert = raw
+        return raw
+
     def restore_if_not_word(self, is_word):
         """At the end of a word: the raw keys if the engine made a Vietnamese-looking word that the
         dictionary does not know (law -> lă -> law). is_word gets the lowercase old-style spelling."""

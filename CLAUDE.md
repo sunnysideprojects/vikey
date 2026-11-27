@@ -40,7 +40,7 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
 - `Sources/ViKeySelfTest/` — engine tests as an executable (no XCTest, works with Command Line Tools only); reads
   the engine cases from `reference/cases.tsv` at run time.
 - `reference/` — Python port of the engine (`engine.py`) + shared `cases.tsv`, `restore.tsv` (word-end restore,
-  column 4 = the one word the fake dictionary knows) + `test_engine.py` (incl. 20k-word
+  column 4 = the one word the fake dictionary knows), `revert.tsv` (Esc revert) + `test_engine.py` (incl. 20k-word
   backspace fuzz). The Swift engine mirrors it 1:1; keep them in sync when changing rules.
 
 ## Commands
@@ -89,6 +89,11 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   `sex`→`sẽ`). Doubled-letter words still need a third letter (`bosss`→`boss`): `ass`→`as` and `tesst`→`test` win.
   `Engine.restoreIfNotWord(isWord:)` / `restore_if_not_word`.
 - Repeat a mark key to undo it and type it literally (`ass` → `as`, `aaa` → `aa`).
+- Esc revert (menu "Esc: trả lại các phím đã gõ…", default on, both methods): Esc while a converted word is in
+  progress swallows the Esc and retypes the raw keys under the Space keycode (`car` → `cả` → Esc → `car`); the
+  engine then stays inert (literal) until the word ends. Nothing to undo → Esc passes through, so a second Esc
+  always reaches the app. Conflicts with vim's Esc in insert mode (tooltip says to turn it off).
+  `Engine.revert()` / `revert`.
 - `ư` + `o` auto-becomes `ươ`; a following `w`/`7` just confirms it (`uwow` → `ươ`). Open syllable `ươ` renders `uơ` (thuở).
 - Abbreviations: KeyTap tracks a token since the last whitespace/caret move (`tokenPrefix + engine.output`, plus the
   raw keys as a fallback match). Space/Return/Tab, or punctuation that does not extend any key, expands it; the

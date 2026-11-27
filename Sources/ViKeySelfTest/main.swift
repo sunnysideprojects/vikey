@@ -47,6 +47,27 @@ for f in restoreCases {
         print("RESTORE FAIL [\(f[0])] \(f[2]) -> \(got) (expected \(f[4]))")
     }
 }
+// Esc revert, shared with the Python reference: reference/revert.tsv
+// (method, keys, expected revert result or -, keys typed after, expected output).
+let revertText = (try? String(contentsOf: casesFile.deletingLastPathComponent()
+    .appendingPathComponent("revert.tsv"), encoding: .utf8)) ?? ""
+let revertCases = revertText.split(separator: "\n")
+    .map { $0.split(separator: "\t", omittingEmptySubsequences: false).map(String.init) }
+    .filter { $0.count == 5 }
+if revertCases.isEmpty {
+    failures += 1
+    print("REVERT FAIL: cannot read reference/revert.tsv")
+}
+for f in revertCases {
+    let e = typeWord(f[1], method: InputMethod(rawValue: f[0])!)
+    let got = e.revert() ?? "-"
+    for ch in f[3] { e.process(ch) }
+    if got != f[2] || e.output != f[4] {
+        failures += 1
+        print("REVERT FAIL [\(f[0])] \(f[1]) -> \(got), \(e.output) (expected \(f[2]), \(f[4]))")
+    }
+}
+
 let candidates = Vietnamese.syllableCandidates()
 for w in ["khách", "ngày", "nghiêng", "thuở", "quýt", "gìn", "đồng", "khuỷu", "lă", "hòa", "thủy"]
     where !candidates.contains(w) {
@@ -177,7 +198,7 @@ for bad in ["", "v", "beta", "1..2", "1.x", "١.٢"] where v(bad) != nil {
 check("version description", v("v1.0.3")?.description, "1.0.3")
 
 if failures == 0 {
-    print("ViKey self-test: \(cases.count + restoreCases.count + bsCases.count) cases + fuzz OK, \(candidates.count) syllable candidates")
+    print("ViKey self-test: \(cases.count + restoreCases.count + revertCases.count + bsCases.count) cases + fuzz OK, \(candidates.count) syllable candidates")
 } else {
     print("ViKey self-test: \(failures) failure(s)")
     exit(1)

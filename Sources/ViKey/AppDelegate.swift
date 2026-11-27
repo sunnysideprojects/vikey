@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         keyTap.onToggle = { [weak self] in self?.toggle() }
         keyTap.macroEnabled = settings.macroEnabled
         keyTap.englishRestore = settings.englishRestore
+        keyTap.escRevert = settings.escRevert
         keyTap.isWord = { [lexicon] in lexicon.contains($0) }
         lexicon.load()
         macroFile.onChange = { [weak self] table in
@@ -179,6 +180,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         restore.toolTip = "Khi gõ Telex và hết từ, nếu từ vừa gõ thành chữ không có trong từ điển tiếng Việt "
             + "của macOS (lă, ýe, mỏe) thì ViKey trả lại đúng các phím đã gõ. Cần bật kiểm tra chính tả."
         menu.addItem(restore)
+        let esc = item("Esc: trả lại các phím đã gõ của từ vừa gõ (cả → car)", #selector(toggleEscRevert),
+                       checked: settings.escRevert)
+        esc.toolTip = "Ngay sau một từ bị đổi thành tiếng Việt, bấm Esc để lấy lại đúng các phím đã gõ. "
+            + "Lúc đó Esc không đến được app (bấm Esc lần nữa nếu cần). Tắt nếu bạn dùng vim."
+        menu.addItem(esc)
         menu.addItem(item("Nhớ Việt/Anh theo từng ứng dụng", #selector(toggleSmart), checked: settings.smartSwitch))
         menu.addItem(item("Sửa lỗi gợi ý trên thanh địa chỉ trình duyệt", #selector(toggleBrowserFix), checked: settings.browserFix))
 
@@ -306,6 +312,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleEnglishRestore() {
         settings.englishRestore.toggle()
         keyTap.englishRestore = settings.englishRestore
+        refreshUI()
+    }
+
+    @objc private func toggleEscRevert() {
+        settings.escRevert.toggle()
+        keyTap.escRevert = settings.escRevert
         refreshUI()
     }
 

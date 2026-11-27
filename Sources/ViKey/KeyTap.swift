@@ -35,6 +35,8 @@ final class KeyTap {
     /// Word-end restore of English words that came out as non-words (`law` -> `lă` -> `law`).
     var englishRestore = true
     var isWord: ((String) -> Bool)?
+    /// Esc right after a converted word puts back the raw keys (`car` -> `cả` -> Esc -> `car`).
+    var escRevert = true
 
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -122,6 +124,7 @@ final class KeyTap {
             return pass
         }
         if !isEngineKey(ch) {
+            if ch == "\u{1B}", escRevert, revertWord(proxy: proxy) { return nil }
             if expandMacro(trigger: ch, event: event, keyCode: keyCode, proxy: proxy) { return nil }
             if restoreWord(trigger: ch, event: event, keyCode: keyCode, proxy: proxy) { return nil }
             if Self.isTokenChar(ch) {
@@ -180,6 +183,17 @@ final class KeyTap {
             copy.setIntegerValueField(.eventSourceUserData, value: Self.syntheticMarker)
             copy.tapPostEvent(proxy)
         }
+        return true
+    }
+
+    /// Esc: if the word being typed was converted, swallow the Esc and put back the raw keys. The
+    /// word then stays literal until it ends. Nothing to undo: Esc passes through as usual (a second
+    /// Esc always does).
+    private func revertWord(proxy: CGEventTapProxy) -> Bool {
+        let old = engine.output
+        guard let raw = engine.revert() else { return false }
+        // The Escape keycode could still close a dialog or leave insert mode: type under Space.
+        replace(old: old, new: raw, keyCode: Self.spaceKey, proxy: proxy)
         return true
     }
 

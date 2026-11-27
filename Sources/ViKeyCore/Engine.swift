@@ -103,6 +103,17 @@ public final class Engine {
         return output
     }
 
+    /// Esc: give back the raw keys of the word being typed (`car` -> `cả` -> `car`), then type
+    /// literally until reset. Nil when there is nothing to undo.
+    public func revert() -> String? {
+        guard inert == nil, !keys.isEmpty else { return nil }
+        let raw = String(keys)
+        guard raw != output else { return nil }
+        reset()
+        inert = raw
+        return raw
+    }
+
     /// At the end of a word: the raw keys if the engine made a Vietnamese-looking word that the
     /// dictionary does not know (`law` -> `lă` -> `law`, `yes` -> `ýe` -> `yes`). Telex only: in VNI the
     /// raw keys are digits. `isWord` gets the lowercase old-style spelling (`khỏe`, `thủy`, `hòa`).
