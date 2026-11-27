@@ -28,7 +28,15 @@ final class KeyTap {
     var enabled = true
     var hotkey: Hotkey = .ctrlShift
     var browserFix = true
-    var frontBundleID: String?
+    /// Use the address-bar trick only when the focus is outside the web page (asks Accessibility).
+    var addressBarOnly = false
+    var frontBundleID: String? {
+        didSet { webFocus = nil }
+    }
+    /// Fast-typing fallbacks, per app (bundle IDs). Slow: a short pause after every key ViKey sends.
+    var slowApps: Set<String> = []
+    /// Real key: the last character of a change goes out in the user's own (edited) key event.
+    var realKeyApps: Set<String> = []
     var onToggle: (() -> Void)?
     var macros = MacroTable()
     var macroEnabled = true
@@ -49,6 +57,11 @@ final class KeyTap {
     /// Physical keys typed in the token (`ddc`), a fallback match when the screen text differs (`đc`).
     private var tokenKeys = ""
     private var tokenKeysValid = true
+
+    /// Whether the focused text field sits inside a web page (nil: not asked yet since the focus
+    /// may have moved). Only used with `addressBarOnly`.
+    private var webFocus: Bool?
+    private static let slowPause: useconds_t = 4000  // 4 ms after each key ViKey sends
 
     init(engine: Engine) {
         self.engine = engine
@@ -87,10 +100,12 @@ final class KeyTap {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
             // Keys typed while the tap was off reached the app unseen: our word state is stale.
             resetWord()
+            webFocus = nil
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return pass
         case .leftMouseDown, .rightMouseDown, .otherMouseDown:
             resetWord()  // caret probably moved
+            webFocus = nil
             return pass
         case .flagsChanged:
             handleModifiers(event.flags)
@@ -108,6 +123,7 @@ final class KeyTap {
         let flags = event.flags
         if flags.contains(.maskCommand) || flags.contains(.maskControl) || flags.contains(.maskAlternate) {
             resetWord()
+            webFocus = nil  // ⌘L, ⌘F, ⌃Tab... move the focus
             return pass
         }
 
@@ -121,9 +137,12 @@ final class KeyTap {
 
         guard let ch = typedCharacter(event) else {
             resetWord()  // arrows, function keys...
+            webFocus = nil
             return pass
         }
         if !isEngineKey(ch) {
+            // Return, Tab and Esc may move the focus (once the key is through).
+            if ch == "\r" || ch == "\t" || ch == "\u{1B}" || ch == "\u{3}" { webFocus = nil }
             if ch == "\u{1B}", escRevert, revertWord(proxy: proxy) { return nil }
             if expandMacro(trigger: ch, event: event, keyCode: keyCode, proxy: proxy) { return nil }
             if restoreWord(trigger: ch, event: event, keyCode: keyCode, proxy: proxy) { return nil }
@@ -142,8 +161,9 @@ final class KeyTap {
         let before = engine.output
         let after = engine.process(ch)
         if after == before + String(ch) { return pass }  // plain typing: let the real key through
-        replace(old: before, new: after, keyCode: keyCode, proxy: proxy)
-        return nil
+        let realKey = frontBundleID.map(realKeyApps.contains) ?? false
+        return replace(old: before, new: after, keyCode: keyCode, proxy: proxy, into: realKey ? event : nil)
+            ? pass : nil
     }
 
     /// Forget the word being typed (caret moved, app switched, settings changed...).
@@ -260,22 +280,78 @@ final class KeyTap {
     /// sent under that keycode, never keycode 0: keycode 0 is the real A key, and when typing fast
     /// the A in "la" + "f/2" is often still held down. Chromium/Electron then treat our fake A press
     /// as a duplicate and drop it, so the backspace lands but "à" never appears ("làm" -> "lm").
-    private func replace(old: String, new: String, keyCode: CGKeyCode, proxy: CGEventTapProxy) {
+    ///
+    /// With `into`, the last character is written into that (real) event instead of a synthetic
+    /// one; the caller then lets the event through. Events posted from the tap enter the system
+    /// before the event the callback returns, so the order holds. Returns whether `into` was used.
+    @discardableResult
+    private func replace(old: String, new: String, keyCode: CGKeyCode, proxy: CGEventTapProxy,
+                         into event: CGEvent? = nil) -> Bool {
         let o = Array(old), n = Array(new)
         var common = 0
         while common < o.count && common < n.count && o[common] == n[common] { common += 1 }
         var deletes = o.count - common
-        let insert = String(n[common...])
+        var insert = String(n[common...])
+        let slow = frontBundleID.map(slowApps.contains) ?? false
 
-        if browserFix && deletes > 0, let id = frontBundleID, Self.browsers.contains(id) {
+        if browserFix && deletes > 0, let id = frontBundleID, Self.browsers.contains(id), !focusInWebPage() {
             // Address bars keep an autocomplete suggestion selected after the caret; a backspace
             // would delete the suggestion instead of our character. Typing a throwaway char first
             // replaces the suggestion, then we delete it along with the rest.
-            postText("\u{202F}", keyCode: keyCode, proxy: proxy)
+            postText("\u{202F}", keyCode: keyCode, slow: slow, proxy: proxy)
             deletes += 1
         }
-        for _ in 0..<deletes { postKey(Self.backspaceKey, proxy: proxy) }
-        postText(insert, keyCode: keyCode, proxy: proxy)
+        for _ in 0..<deletes { postKey(Self.backspaceKey, slow: slow, proxy: proxy) }
+        guard let event, let last = insert.popLast() else {
+            postText(insert, keyCode: keyCode, slow: slow, proxy: proxy)
+            return false
+        }
+        postText(insert, keyCode: keyCode, slow: slow, proxy: proxy)
+        let units = Array(String(last).utf16)
+        units.withUnsafeBufferPointer { buf in
+            event.keyboardSetUnicodeString(stringLength: buf.count, unicodeString: buf.baseAddress)
+        }
+        return true
+    }
+
+    // MARK: - Focus (address-bar trick only where it is needed)
+
+    /// True when `addressBarOnly` is on and the focused element is inside a web page (an
+    /// AXWebArea), where there is no inline autocomplete. Any doubt (no answer, slow app) = false,
+    /// so the trick stays. Asked once per focus: kept until a click, Return/Tab/Esc, a ⌘/⌃/⌥
+    /// combo, an arrow key or an app switch.
+    private func focusInWebPage() -> Bool {
+        guard addressBarOnly else { return false }
+        if let webFocus { return webFocus }
+        let answer = Self.askFocusInWebPage()
+        if let answer { webFocus = answer }
+        return answer ?? false
+    }
+
+    /// nil: no answer in time (asked again next change).
+    private static func askFocusInWebPage() -> Bool? {
+        guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else { return nil }
+        let deadline = CFAbsoluteTimeGetCurrent() + 0.03  // the tap blocks all typing meanwhile
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, 0.02)
+        guard var element = axElement(app, kAXFocusedUIElementAttribute) else { return nil }
+        for _ in 0..<40 {
+            if CFAbsoluteTimeGetCurrent() > deadline { return nil }
+            AXUIElementSetMessagingTimeout(element, 0.02)
+            var role: CFTypeRef?
+            if AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &role) == .success,
+               role as? String == "AXWebArea" { return true }
+            guard let parent = axElement(element, kAXParentAttribute) else { return false }
+            element = parent
+        }
+        return false
+    }
+
+    private static func axElement(_ element: AXUIElement, _ attribute: String) -> AXUIElement? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
+              let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
+        return (value as! AXUIElement)
     }
 
     private func mark(_ e: CGEvent) {
@@ -283,15 +359,16 @@ final class KeyTap {
         e.flags = []
     }
 
-    private func postKey(_ code: CGKeyCode, proxy: CGEventTapProxy) {
+    private func postKey(_ code: CGKeyCode, slow: Bool = false, proxy: CGEventTapProxy) {
         for down in [true, false] {
             guard let e = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: down) else { continue }
             mark(e)
             e.tapPostEvent(proxy)
         }
+        if slow { usleep(Self.slowPause) }
     }
 
-    private func postText(_ text: String, keyCode: CGKeyCode, proxy: CGEventTapProxy) {
+    private func postText(_ text: String, keyCode: CGKeyCode, slow: Bool = false, proxy: CGEventTapProxy) {
         for ch in text {
             let units = Array(String(ch).utf16)
             for down in [true, false] {
@@ -302,6 +379,7 @@ final class KeyTap {
                 mark(e)
                 e.tapPostEvent(proxy)
             }
+            if slow { usleep(Self.slowPause) }
         }
     }
 }

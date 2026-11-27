@@ -80,6 +80,21 @@ final class Settings {
         get { bool("browserFix", true) }
         set { d.set(newValue, forKey: "browserFix") }
     }
+    /// Skip the address-bar trick when Accessibility says the focus is inside a web page.
+    var addressBarOnly: Bool {
+        get { bool("addressBarOnly", false) }
+        set { d.set(newValue, forKey: "addressBarOnly") }
+    }
+    /// Fast-typing fallbacks, per app (bundle IDs): pause between the keys ViKey sends.
+    var slowApps: Set<String> {
+        get { Set(d.stringArray(forKey: "slowApps") ?? []) }
+        set { d.set(newValue.sorted(), forKey: "slowApps") }
+    }
+    /// Send the last character of a change in the real key event.
+    var realKeyApps: Set<String> {
+        get { Set(d.stringArray(forKey: "realKeyApps") ?? []) }
+        set { d.set(newValue.sorted(), forKey: "realKeyApps") }
+    }
     var hotkey: Hotkey {
         get { Hotkey(rawValue: d.string(forKey: "hotkey") ?? "") ?? .ctrlShift }
         set { d.set(newValue.rawValue, forKey: "hotkey") }

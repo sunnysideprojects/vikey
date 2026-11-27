@@ -119,9 +119,14 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   fast, so the app dropped them); now they reuse the keycode of the swallowed key. Also `engine.reset()` when the
   tap gets disabled by timeout. The "la2m" symptom was only a consequence: the screen lost a char the engine still
   had, so the retyped word looked invalid and mark keys passed through. If it ever comes back: find out which app,
-  compare with TextEdit, then consider
-  (a) returning the modified original event for the last char instead of swallowing it, (b) a per-app slow mode with
-  small delays between synthetic events, (c) skipping the browser-fix U+202F trick outside address bars.
+  compare with TextEdit, then try the fallbacks (menu "Sửa lỗi mất chữ khi gõ nhanh", all off by default):
+  per app (`slowApps` / `realKeyApps` bundle IDs; the submenu names the front app, rebuilt on app switch)
+  (a) "Gửi chữ cuối bằng chính phím vừa bấm": the last char of a change is written into the real key event, which
+  is then passed through (events posted from the tap enter the system before the returned one), (b) "Gõ chậm":
+  4 ms `usleep` after each synthetic key inside the tap callback (keeps the order, blocks typing briefly); global
+  (c) "Chỉ dùng ở thanh địa chỉ…" under the browser fix: asks AX whether the focused element has an AXWebArea
+  ancestor (30 ms budget, cached until click/Return/Tab/Esc/arrow/⌘⌃⌥ combo/app switch; no answer = keep the
+  U+202F trick). Not checked against Chrome's AX tree yet (Claude's shell has no Accessibility permission).
 - Abbreviations (gõ tắt) with the user's ukmacro.txt on Google Drive: user confirmed working 2026-11-24.
 - Known limits: no typing under Secure Input (password fields; shown with a lock in the menu bar), no restoring an old word after the caret moved, Unicode only.
 

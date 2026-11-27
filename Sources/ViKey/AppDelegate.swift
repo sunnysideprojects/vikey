@@ -21,6 +21,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         keyTap.enabled = settings.enabled
         keyTap.hotkey = settings.hotkey
         keyTap.browserFix = settings.browserFix
+        keyTap.addressBarOnly = settings.addressBarOnly
+        keyTap.slowApps = settings.slowApps
+        keyTap.realKeyApps = settings.realKeyApps
         keyTap.frontBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         keyTap.onToggle = { [weak self] in self?.toggle() }
         keyTap.macroEnabled = settings.macroEnabled
@@ -115,6 +118,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if settings.smartSwitch, let id = app?.bundleIdentifier, let saved = settings.appStates[id],
            saved != settings.enabled {
             setEnabled(saved, remember: false)
+        } else {
+            refreshUI()  // the fast-typing submenu names the front app
         }
     }
 
@@ -187,6 +192,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(esc)
         menu.addItem(item("Nhớ Việt/Anh theo từng ứng dụng", #selector(toggleSmart), checked: settings.smartSwitch))
         menu.addItem(item("Sửa lỗi gợi ý trên thanh địa chỉ trình duyệt", #selector(toggleBrowserFix), checked: settings.browserFix))
+        let addressBar = item("Chỉ dùng ở thanh địa chỉ, không dùng trong trang web",
+                              settings.browserFix ? #selector(toggleAddressBarOnly) : nil,
+                              checked: settings.addressBarOnly)
+        addressBar.indentationLevel = 1
+        addressBar.toolTip = "Để sửa lỗi gợi ý, ViKey gõ thêm một ký tự đệm rồi xoá đi mỗi khi đổi chữ. Bật mục này "
+            + "thì ViKey hỏi macOS (qua Accessibility) ô đang gõ có nằm trong trang web không, và bỏ ký tự đệm ở đó: "
+            + "ít phím hơn, ít mất chữ hơn khi gõ nhanh. Trình duyệt có thể chậm đi một chút vì phải bật trợ năng."
+        menu.addItem(addressBar)
+        menu.addItem(fastTypingMenu())
 
         let hk = NSMenuItem(title: "Phím chuyển Việt/Anh", action: nil, keyEquivalent: "")
         let sub = NSMenu()
@@ -209,6 +223,81 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(item("Giới thiệu ViKey", #selector(showAbout)))
         menu.addItem(item("Thoát ViKey", #selector(quit)))
         return menu
+    }
+
+    // MARK: - Fast-typing fallbacks
+
+    /// The app the user is typing in (the menu does not activate ViKey), unless that is ViKey.
+    private var targetApp: String? {
+        guard let id = keyTap.frontBundleID, id != Bundle.main.bundleIdentifier else { return nil }
+        return id
+    }
+
+    private func appName(_ id: String) -> String {
+        if let app = NSRunningApplication.runningApplications(withBundleIdentifier: id).first,
+           let name = app.localizedName { return name }
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
+            return url.deletingPathExtension().lastPathComponent
+        }
+        return id
+    }
+
+    private func fastTypingMenu() -> NSMenuItem {
+        let target = targetApp
+        let top = NSMenuItem(title: "Sửa lỗi mất chữ khi gõ nhanh", action: nil, keyEquivalent: "")
+        let sub = NSMenu()
+        sub.autoenablesItems = false
+        let header = NSMenuItem(title: "Chỉ áp dụng cho \(target.map(appName) ?? "ứng dụng đang dùng"):",
+                                action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        sub.addItem(header)
+        let slow = item("Gõ chậm (nghỉ giữa các phím ViKey gửi)", #selector(toggleSlowApp),
+                        checked: target.map(settings.slowApps.contains) ?? false)
+        slow.toolTip = "Khi đổi chữ, ViKey gửi vài phím xoá rồi chữ mới. Mục này cho nghỉ 4 ms sau mỗi phím. "
+            + "Thử khi app này vẫn mất chữ hoặc ra chữ lộn xộn lúc gõ nhanh (máy ảo, remote desktop, một số app)."
+        let real = item("Gửi chữ cuối bằng chính phím vừa bấm", #selector(toggleRealKeyApp),
+                        checked: target.map(settings.realKeyApps.contains) ?? false)
+        real.toolTip = "Chữ cuối của phần đổi (à trong là) đi trong phím thật bạn vừa bấm, chỉ sửa nội dung, "
+            + "thay vì một phím giả. Thử khi app này bỏ mất chữ có dấu vừa gõ."
+        for i in [slow, real] {
+            i.isEnabled = target != nil
+            i.indentationLevel = 1
+            sub.addItem(i)
+        }
+        let on = settings.slowApps.union(settings.realKeyApps).map(appName).sorted()
+        if !on.isEmpty {
+            sub.addItem(.separator())
+            let list = NSMenuItem(title: "Đang bật cho: \(on.joined(separator: ", "))", action: nil, keyEquivalent: "")
+            list.isEnabled = false
+            sub.addItem(list)
+        }
+        top.submenu = sub
+        if let target, settings.slowApps.contains(target) || settings.realKeyApps.contains(target) { top.state = .on }
+        return top
+    }
+
+    @objc private func toggleSlowApp() {
+        guard let id = targetApp else { return }
+        var apps = settings.slowApps
+        if apps.remove(id) == nil { apps.insert(id) }
+        settings.slowApps = apps
+        keyTap.slowApps = apps
+        refreshUI()
+    }
+
+    @objc private func toggleRealKeyApp() {
+        guard let id = targetApp else { return }
+        var apps = settings.realKeyApps
+        if apps.remove(id) == nil { apps.insert(id) }
+        settings.realKeyApps = apps
+        keyTap.realKeyApps = apps
+        refreshUI()
+    }
+
+    @objc private func toggleAddressBarOnly() {
+        settings.addressBarOnly.toggle()
+        keyTap.addressBarOnly = settings.addressBarOnly
+        refreshUI()
     }
 
     // MARK: - Clipboard tools
