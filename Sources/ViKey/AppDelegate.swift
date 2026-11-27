@@ -14,6 +14,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let secureInput = SecureInputMonitor()
     private let settingsState = SettingsState()
     private var autoUpdateRunning = false
+    /// A typing test (test build only) owns the engine settings: stored preferences stay unapplied.
+    private var testing = false
     private let updates = UpdateChecker(
         currentVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
 
@@ -57,11 +59,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if CommandLine.arguments.contains("--settings") { showSettings() }
         // `--check-update`: run the manual check at launch (for checking the dialog).
         if CommandLine.arguments.contains("--check-update") { checkForUpdates() }
+        #if TYPING_TEST
+        if let options = TypingTest.options(from: CommandLine.arguments) { runTypingTest(options) }
+        #endif
     }
+
+    #if TYPING_TEST
+    /// `--typing-test cases.tsv --out results.tsv`: type the cases through the tap, write the
+    /// results, quit. Settings are forced in memory only (defaults, macros off), never stored.
+    private func runTypingTest(_ options: TypingTest.Options) {
+        testing = true
+        let test = TypingTest(options: options)
+        test.status = { [unowned self] in (keyTap.isRunning, lexicon.isReady) }
+        test.prepare = { [unowned self] method in
+            engine.method = method
+            engine.modernTone = false
+            engine.spellCheck = true
+            keyTap.enabled = true
+            keyTap.englishRestore = true
+            keyTap.escRevert = true
+            keyTap.backspaceResume = true
+            keyTap.macroEnabled = false
+            keyTap.resetWord()
+        }
+        test.run { failures in exit(failures == 0 ? 0 : 1) }
+    }
+    #endif
 
     /// Pushes the stored preferences into the engine and the tap. Runs at launch and after every
     /// UserDefaults change (menu or settings window), so it only acts on what differs.
     private func applySettings() {
+        guard !testing else { return }
         var wordStale = false
         if engine.method != settings.method {
             engine.method = settings.method
@@ -149,7 +177,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
         keyTap.frontBundleID = app?.bundleIdentifier
         keyTap.resetWord()
-        if settings.smartSwitch, let id = app?.bundleIdentifier, let saved = settings.appStates[id],
+        if !testing, settings.smartSwitch, let id = app?.bundleIdentifier, let saved = settings.appStates[id],
            saved != settings.enabled {
             setEnabled(saved, remember: false)
         }

@@ -44,11 +44,13 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   is off, a newer release adds a top menu line that opens the release page; never downloads or installs; `--check-update`
   launch arg runs the manual check), `AboutWindow.swift` ("Giới thiệu
   ViKey", Sunny Side Projects brand: tokens, Bricolage Grotesque, endorsement line; `--about` launch arg opens it),
-  `ViKeyApp.swift` (@main).
+  `ViKeyApp.swift` (@main), `TypingTest.swift` (end-to-end typing test, only compiled with `-DTYPING_TEST`, see
+  Commands).
 - `Resources/` — Info.plist, `AppIcon.icns`, the SSP logo and Bricolage font (OFL), copied into Contents/Resources by
   build.sh. Brand source: ~/Documents/Workplace/SSP/brand (BRAND-BOOK.md, tokens/tokens.json).
 - `scripts/` — `build-icon.sh` + `make-icon.swift` (app icon), `frame-screenshots.swift` (README screenshot),
-  `make-signing-cert.sh` (one-time signing certificate, see Repo and releases), `release.sh` (GitHub release, see below).
+  `make-signing-cert.sh` (one-time signing certificate, see Repo and releases), `release.sh` (GitHub release, see below),
+  `typing-test.sh` + `typing-cases.tsv` (end-to-end typing test).
 - `docs/` — README images only: `vikey-icon.png` (logo), `screenshot.png` (menu + About window).
 - `Sources/ViKeySelfTest/` — engine tests as an executable (no XCTest, works with Command Line Tools only); reads
   the engine cases from `reference/cases.tsv` at run time.
@@ -62,6 +64,18 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
 - `bash build.sh` / `bash build.sh --install` — universal build, sign (the "ViKey Code Signing" certificate if the
   keychain has it, else ad-hoc; `VIKEY_SIGN_IDENTITY=<sha1|->` overrides), copy to /Applications. `--install` keeps
   the Accessibility grant when the designated requirement is unchanged, else `tccutil reset` + re-prompt.
+- `bash scripts/typing-test.sh [--delay MS] [--app BUNDLE_ID] [cases.tsv]` — end-to-end typing test (~30 s, needs
+  the signing certificate and an unlocked screen; hands off the keyboard and mouse). Builds ViKey with
+  `-DTYPING_TEST` into `.build/typing-test`, bundles `build/ViKeyTest.app` with the same bundle ID and certificate
+  (so it shares the installed app's Accessibility grant), quits the installed ViKey, runs it via `open -W`, then
+  deletes it and reopens the installed app. The test build posts real key events at the HID level (they pass the
+  tap like keyboard keys) into a window of its own, or with `--app` into the focused field of that app (read back
+  with ⌘A ⌘C, clipboard restored; Return sends in chat apps!). Settings are forced in memory only (defaults,
+  macros off; `testing` blocks applySettings and smart switch). Aborts if the focus moves. Claude can run it: it
+  needs no permission for Claude's shell. The test code must never be in release builds (it would let anything
+  that can launch ViKey type into other apps with its Accessibility grant); `strings` on the release binary shows
+  no `--typing-test`. The very first run after adding it typed nothing (new bundle not trusted yet?); it now
+  fails early with an error when the tap is not running or posting is not allowed.
 - `open /Applications/ViKey.app --args --about` (after `pkill -x ViKey`) — launch with the About window open
   (`--settings` for the settings window).
 
@@ -146,6 +160,8 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   window + short menu. None of these confirmed by the user in real apps yet. (v1.0.10) stable self-signed
   signing; checked 2026-11-27 that a rebuild keeps the Accessibility grant (event tap enabled, no re-grant).
 - Built 2026-11-27, not released: backspace into the previous word (not tried by the user in real apps yet).
+- Built 2026-11-28: end-to-end typing test; 39 cases pass in its own window (8 ms and 0 ms between keys) and in
+  TextEdit. Not run against Chrome/Electron apps yet (the fast-typing bugs were there).
 - Fixed (user confirmed 2026-11-16): fast typing dropped text ("làm" → "lm"; after deleting and retyping → "a2a2" /
   "la2m"). User types VNI. Cause: synthetic text events used keycode 0 (= the A key, often still held when typing
   fast, so the app dropped them); now they reuse the keycode of the swallowed key. Also `engine.reset()` when the

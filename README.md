@@ -86,7 +86,8 @@ Sources/ViKey/          app menu bar
 Sources/ViKeySelfTest/  test engine (build.sh chạy trước khi build)
 Resources/              Info.plist, AppIcon.icns, logo + font brand
 scripts/                vẽ lại icon app (build-icon.sh), đóng khung ảnh chụp màn hình (frame-screenshots.swift),
-                        tạo chứng chỉ ký (make-signing-cert.sh), phát hành (release.sh)
+                        tạo chứng chỉ ký (make-signing-cert.sh), phát hành (release.sh),
+                        test gõ phím thật qua ViKey (typing-test.sh + typing-cases.tsv)
 docs/                   logo và ảnh chụp màn hình dùng trong README
 reference/              bản engine Python tương đương + cases.tsv dùng chung
 ```

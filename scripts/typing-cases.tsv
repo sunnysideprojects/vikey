@@ -1,0 +1,57 @@
+# End-to-end typing cases for scripts/typing-test.sh: method<TAB>keys<TAB>expected text.
+# Keys: {BS} {ESC} {RET} {TAB}; ␣ is a space and ⏎ a newline in both columns. Each case starts in an
+# empty field with the default settings (spell check, English restore, Esc revert, backspace into the
+# previous word all on; abbreviations off).
+
+# Words
+telex	tieengs	tiếng
+telex	Vieejt	Việt
+telex	dduwowcj	được
+telex	nguwowif	người
+telex	thuowr	thuở
+telex	khoer	khỏe
+telex	quyeets	quyết
+telex	giwx	giữ
+telex	TIEENGS	TIẾNG
+telex	DDuwowcj	Được
+vni	tie6ng1	tiếng
+vni	Vie65t	Việt
+vni	d9u7o7c5	được
+vni	ngu7o72i	người
+vni	thu7o73	thuở
+vni	la2m	làm
+
+# Sentences (each word goes through the tap, with spaces and punctuation between)
+telex	Tieengs Vieejt laf ngoon nguwx cuar nguwowif Vieejt Nam.	Tiếng Việt là ngôn ngữ của người Việt Nam.
+vni	Tie6ng1 Vie65t la2 ngo6n ngu74 cu3a ngu7o72i Vie65t Nam.	Tiếng Việt là ngôn ngữ của người Việt Nam.
+
+# Undo by repeating a key, spell check
+telex	ass	as
+telex	aaa	aa
+telex	tesst	test
+telex	windows	windows
+telex	google␣class	google␣class
+vni	a11	a1
+
+# Word-end restore of English words (needs the macOS Vietnamese dictionary)
+telex	law␣	law␣
+telex	yes␣	yes␣
+telex	more.	more.
+telex	car␣	cả␣
+telex	chaof␣	chào␣
+
+# Esc revert
+telex	car{ESC}	car
+telex	car{ESC}s	cars
+
+# Backspace inside a word
+telex	tieengs{BS}{BS}t	tiết
+vni	la2m{BS}{BS}a2	là
+
+# Backspace into the previous word
+telex	tieeng␣{BS}s	tiếng
+telex	xin chao␣{BS}f	xin chào
+telex	xin chao␣{BS}{BS}{BS}{BS}{BS}{BS}f	xìn
+telex	toi.␣{BS}{BS}s	tói
+vni	to6i␣{BS}1	tối
+telex	tieeng{RET}{BS}s	tiêngs
