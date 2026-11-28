@@ -43,18 +43,7 @@ public struct MacroTable {
         count += 1
     }
 
-    public static func decode(_ data: Data) -> String {
-        let b = [UInt8](data.prefix(3))
-        if b.count >= 2, b[0] == 0xFF, b[1] == 0xFE {
-            return String(data: data.dropFirst(2), encoding: .utf16LittleEndian) ?? ""
-        }
-        if b.count >= 2, b[0] == 0xFE, b[1] == 0xFF {
-            return String(data: data.dropFirst(2), encoding: .utf16BigEndian) ?? ""
-        }
-        let body = b == [0xEF, 0xBB, 0xBF] ? data.dropFirst(3) : data
-        // Not valid UTF-8: probably an old single-byte file; Latin-1 at least keeps the ASCII keys.
-        return String(data: body, encoding: .utf8) ?? String(data: body, encoding: .isoLatin1) ?? ""
-    }
+    public static func decode(_ data: Data) -> String { MacroDocument.decode(data).0 }
 
     public static func parse(_ text: String) -> [(String, String)] {
         var out: [(String, String)] = []

@@ -10,11 +10,20 @@ final class SettingsState: ObservableObject {
     @Published var macroPath: String?
     @Published var macroInfo = ""
     @Published var macroFailed = false
+    @Published var macroEntries: [MacroEntry] = []
+    @Published var macroWritable = false
+    /// Read fine but in an encoding ViKey does not write (old single-byte file).
+    @Published var macroReadOnly = false
     @Published var loginEnabled = false
     /// Bundle IDs in the fast-typing list: apps with a fix on, plus ones just added.
     @Published var fixApps: [String] = []
 
     var chooseMacroFile: () -> Void = {}
+    var createMacroFile: () -> Void = {}
+    /// Writes one edit; the callback gets a message to show, or nil when done (saved, or the user
+    /// chose to keep what the file says).
+    var saveMacro: (MacroEdit, @escaping (String?) -> Void) -> Void = { _, done in done(nil) }
+    var showMacroBackups: () -> Void = {}
     var openMacroFile: () -> Void = {}
     var reloadMacroFile: () -> Void = {}
     var clearMacroFile: () -> Void = {}
@@ -187,8 +196,39 @@ private struct TypingTab: View {
 private struct MacroTab: View {
     @EnvironmentObject private var state: SettingsState
     @AppStorage("macroEnabled") private var macroEnabled = true
+    @State private var search = ""
+    @State private var selection: String?
+    @State private var editing: EditRequest?
+    @State private var message: String?
 
-    var body: some View {
+    private struct EditRequest: Identifiable {
+        let id = UUID()
+        let original: MacroEntry?
+    }
+
+    private var shown: [MacroEntry] {
+        let q = search.trimmingCharacters(in: .whitespaces)
+        if q.isEmpty { return state.macroEntries }
+        return state.macroEntries.filter { $0.key.localizedStandardContains(q) || $0.value.localizedStandardContains(q) }
+    }
+
+    private func entry(_ key: String?) -> MacroEntry? {
+        key.flatMap { k in state.macroEntries.first { $0.key == k } }
+    }
+
+    private func edit(_ key: String?) {
+        guard state.macroWritable, let e = entry(key) else { return }
+        editing = EditRequest(original: e)
+    }
+
+    private func delete(_ key: String?) {
+        guard state.macroWritable, let e = entry(key) else { return }
+        state.saveMacro(.remove(key: e.key, expected: e.value)) { error in
+            if let error { message = error } else if selection == e.key { selection = nil }
+        }
+    }
+
+    private var settingsForm: some View {
         Form {
             Section {
                 Toggle(isOn: $macroEnabled) {
@@ -211,20 +251,141 @@ private struct MacroTab: View {
                 }
                 HStack {
                     Button(state.macroPath == nil ? "Chọn file…" : "Chọn file khác…") { state.chooseMacroFile() }
+                    if state.macroPath == nil {
+                        Button("Tạo file mới…") { state.createMacroFile() }
+                    }
                     Spacer()
                     if state.macroPath != nil {
-                        Button("Mở để sửa") { state.openMacroFile() }
+                        Button("Mở file") { state.openMacroFile() }
+                            .help("Mở bằng ứng dụng sửa văn bản mặc định (TextEdit)")
                         Button("Đọc lại") { state.reloadMacroFile() }
                         Button("Bỏ chọn") { state.clearMacroFile() }
                     }
                 }
-                Text("File có thể nằm trong Google Drive hay iCloud để dùng chung với UniKey trên Windows. "
-                     + "ViKey chỉ đọc, tự đọc lại khi file đổi.")
-                    .font(.callout).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        .frame(width: formWidth, height: 340)
+        // The list lives outside the Form: a Table inside a Form never gets the scroll events.
+        .scrollDisabled(true)
+        .frame(height: state.macroPath == nil ? 250 : 290)
+    }
+
+    private var list: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            TextField("Tìm", text: $search, prompt: Text("Tìm phím tắt hoặc nội dung"))
+                .textFieldStyle(.roundedBorder)
+                .labelsHidden()
+            Table(shown, selection: $selection) {
+                TableColumn("Phím tắt", value: \.key).width(min: 60, ideal: 110, max: 180)
+                TableColumn("Nội dung", value: \.value)
+            }
+            .tableStyle(.bordered(alternatesRowBackgrounds: true))
+            .contextMenu(forSelectionType: String.self) { keys in
+                if state.macroWritable, let key = keys.first {
+                    Button("Sửa…") { edit(key) }
+                    Button("Xoá") { delete(key) }
+                }
+            } primaryAction: { keys in
+                edit(keys.first)
+            }
+            .onDeleteCommand { delete(selection) }
+            HStack(spacing: 8) {
+                Button { editing = EditRequest(original: nil) } label: { Image(systemName: "plus") }
+                    .help("Thêm gõ tắt")
+                    .disabled(!state.macroWritable)
+                Button { delete(selection) } label: { Image(systemName: "minus") }
+                    .help("Xoá gõ tắt đang chọn")
+                    .disabled(!state.macroWritable || entry(selection) == nil)
+                Button("Sửa…") { edit(selection) }
+                    .disabled(!state.macroWritable || entry(selection) == nil)
+                Spacer()
+                Button("Xem bản cũ") { state.showMacroBackups() }
+                    .help("Mở thư mục chứa các bản cũ của file, chép ra trước mỗi lần lưu")
+            }
+            Text(!state.macroReadOnly
+                 ? "Sửa ở đây là ghi thẳng vào file, giữ nguyên định dạng để UniKey trên Windows vẫn đọc được. "
+                     + "Nếu file vừa bị sửa ở máy khác, ViKey hỏi trước khi ghi đè. Đừng để cửa sổ "
+                     + "sửa gõ tắt của UniKey mở lâu: nó lưu lại cả file theo bản nó đang giữ."
+                 : "File không phải UTF-8 hay UTF-16 nên ViKey chỉ đọc. Lưu lại file bằng UniKey "
+                     + "(Unicode) để sửa được ở đây.")
+                .font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            settingsForm
+            if state.macroPath != nil { list }
+        }
+        .frame(width: formWidth, height: state.macroPath == nil ? 250 : 660)
+        .sheet(item: $editing) { request in
+            MacroEditor(original: request.original) { key in selection = key }
+        }
+        .alert(message ?? "", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+            Button("OK") { message = nil }
+        }
+    }
+}
+
+/// Sheet for adding or changing one abbreviation.
+private struct MacroEditor: View {
+    @EnvironmentObject private var state: SettingsState
+    @Environment(\.dismiss) private var dismiss
+    let original: MacroEntry?
+    let saved: (String) -> Void
+    @State private var key: String
+    @State private var value: String
+    @State private var error: String?
+    @State private var saving = false
+
+    init(original: MacroEntry?, saved: @escaping (String) -> Void) {
+        self.original = original
+        self.saved = saved
+        _key = State(initialValue: original?.key ?? "")
+        _value = State(initialValue: original?.value ?? "")
+    }
+
+    private func save() {
+        if let p = MacroDocument.problem(key: key, value: value) {
+            error = p
+            return
+        }
+        let edit: MacroEdit = original.map { .update(key: $0.key, expected: $0.value, newKey: key, value: value) }
+            ?? .add(key: key, value: value)
+        saving = true
+        state.saveMacro(edit) { message in
+            saving = false
+            if let message {
+                error = message
+            } else {
+                saved(key.trimmingCharacters(in: .whitespaces).precomposedStringWithCanonicalMapping)
+                dismiss()
+            }
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(original == nil ? "Thêm gõ tắt" : "Sửa gõ tắt").font(.headline)
+            Form {
+                TextField("Phím tắt", text: $key, prompt: Text("dc"))
+                TextField("Nội dung", text: $value, prompt: Text("được"))
+            }
+            Text(error ?? "Phím tắt viết thường thì gõ hoa cũng được: Dc → Được, DC → ĐƯỢC.")
+                .font(.callout)
+                .foregroundStyle(error == nil ? Color.secondary : Color.red)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button("Huỷ") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Lưu") { save() }.keyboardShortcut(.defaultAction).disabled(saving)
+            }
+        }
+        .padding(20)
+        .frame(width: 420)
     }
 }
 

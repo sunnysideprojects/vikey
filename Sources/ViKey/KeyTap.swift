@@ -211,7 +211,8 @@ final class KeyTap {
     /// `ch` ends the token (whitespace, or punctuation that is not part of any key): if the token
     /// is an abbreviation, replace it on screen, then retype the trigger key itself.
     private func expandMacro(trigger ch: Character, event: CGEvent, keyCode: CGKeyCode, proxy: CGEventTapProxy) -> Bool {
-        guard macroEnabled, !macros.isEmpty else { return false }
+        // Not in ViKey's own windows: typing a key into the abbreviation editor must not expand it.
+        guard macroEnabled, !macros.isEmpty, frontBundleID != Bundle.main.bundleIdentifier else { return false }
         let screen = tokenPrefix + engine.output
         guard !screen.isEmpty else { return false }
         let isText = Self.isTokenChar(ch)

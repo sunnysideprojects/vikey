@@ -19,6 +19,10 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   the previous word on backspace. Swift only; `typeLine` cases in the self-test check it stays equal to the screen.
 - `Sources/ViKeyCore/Macro.swift` — abbreviation table ("gõ tắt") in UniKey `ukmacro.txt` format (UTF-8/BOM/CRLF or
   UTF-16, `;` comment lines, `key:value`). Swift only, not in the Python reference.
+- `Sources/ViKeyCore/MacroDocument.swift` — the same file kept line by line for the editor: encoding, BOM and each
+  line's own ending stay byte for byte, an edit (`MacroEdit` add/update/remove) touches only its line, keeps "no
+  final newline" (UniKey writes it that way), NFC. Each edit carries the value the user saw (`expected`): if the
+  file now says something else it is a `.conflict` unless forced. Latin-1 fallback files are read-only.
 - `Sources/ViKeyCore/TextTools.swift` — `TextTool` conversions for the menu "Chuyển văn bản trong clipboard"
   (AppDelegate `runTool` rewrites the clipboard as plain text, beeps if no text / no change): bỏ dấu, HOA, thường,
   Hoa Đầu Từ, TCVN3 (ABC) → Unicode (table checked against `iconv -f TCVN`, incl. the VN1 capitals; toned
@@ -34,7 +38,11 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   registers the defaults; `SettingsState` carries macro status, login item, the fast-typing app list and actions;
   remembers the last tab in `settingsTab`; `--settings` launch arg opens it),
   `Settings.swift` (UserDefaults), `MacroFile.swift` (polls the chosen ukmacro.txt every 3 s off the main thread,
-  read-only, so it can sit in Google Drive and be shared with UniKey on Windows), `SecureInput.swift` (polls
+  so it can sit in Google Drive and be shared with UniKey on Windows; writes editor changes: re-reads inside an
+  `NSFileCoordinator` write, applies the one edit, overwrites in place (same inode and xattrs: Google Drive keeps it
+  as the same item via `com.google.drivefs.item-id#S`), reads back; copies the old bytes to
+  `~/Library/Application Support/ViKey/Gõ tắt cũ/` first, keeps 30; tab Gõ tắt has the table + add/edit sheet,
+  AppDelegate asks on a conflict), `SecureInput.swift` (polls
   `IsSecureEventInputEnabled` every 1 s; holder app from the session's `kCGSSessionSecureInputPID`, which names
   the responsible GUI app; menu bar shows a lock + greyed letter and a menu line), `Updater.swift` (Sparkle 2,
   see Repo and releases; `SPUStandardUpdaterController`, daily automatic checks unless "Tự kiểm tra cập nhật" is
@@ -193,6 +201,11 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   ancestor (30 ms budget, cached until click/Return/Tab/Esc/arrow/⌘⌃⌥ combo/app switch; no answer = keep the
   U+202F trick). Not checked against Chrome's AX tree yet (Claude's shell has no Accessibility permission).
 - Abbreviations (gõ tắt) with the user's ukmacro.txt on Google Drive: user confirmed working 2026-11-24.
+- Built 2026-11-28 (not released): editing gõ tắt in Settings. Checked with a harness on a test copy in Google Drive
+  (add/update/stale-update conflict/remove): same inode and Drive item ID, CRLF and no final newline kept, Drive
+  reported it uploaded. Not checked: the cloud copy itself (the Drive connector is another account), the sheet UI
+  by hand, UniKey on Windows reading the edited file. Macro expansion is off in ViKey's own windows (KeyTap checks
+  `frontBundleID`), so typing a key in the editor does not expand it.
 - Known limits: no typing under Secure Input (password fields; shown with a lock in the menu bar), no restoring an old word after the caret moved, Unicode only.
 
 ## Conventions

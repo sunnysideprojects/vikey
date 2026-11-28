@@ -223,6 +223,79 @@ var utf16 = Data([0xFF, 0xFE])
 utf16.append("x;y\nvs:với\n".data(using: .utf16LittleEndian)!)
 check("utf16", MacroTable(data: utf16).lookup("vs"), "với")
 
+// Editing: the file comes back byte for byte, an edit touches only its own line, and a value the
+// user did not see (changed on another machine) is a conflict unless forced.
+func bytes(_ s: String, bom: Bool = false) -> Data { (bom ? Data([0xEF, 0xBB, 0xBF]) : Data()) + Data(s.utf8) }
+func checkDoc(_ label: String, _ doc: MacroDocument, _ expected: Data) {
+    if doc.data() != expected {
+        failures += 1
+        let got = String(data: doc.data(), encoding: .utf8) ?? doc.data().map { String($0) }.joined(separator: " ")
+        print("MACRO EDIT FAIL \(label): \(got.debugDescription)")
+    }
+}
+var utf16BE = Data([0xFE, 0xFF])
+utf16BE.append(";h\r\nvs:với\r\n".data(using: .utf16BigEndian)!)
+let roundTrips: [(String, Data)] = [
+    ("unikey", ukmacro.data(using: .utf8)!),
+    ("utf16le", utf16), ("utf16be", utf16BE),
+    ("mixed endings, no final newline", bytes(";h\r\na:b\nc:d\re:f")),
+    ("empty", Data()),
+]
+for (label, data) in roundTrips { checkDoc("round trip \(label)", MacroDocument(data: data), data) }
+
+let header = ";DO NOT DELETE THIS LINE*** version=1 ***"
+let base = header + "\r\n; comment\r\ndc:được\r\n  k0 :không\r\nvs:với"  // no final CRLF, as UniKey writes
+var doc = MacroDocument(data: bytes(base, bom: true))
+check("doc entries", doc.entries.map { "\($0.key)=\($0.value)" }.joined(separator: ","), "dc=được,k0=không,vs=với")
+check("add", "\(doc.apply(.add(key: "ntn", value: "như thế nào")))", "applied")
+checkDoc("add", doc, bytes(base + "\r\nntn:như thế nào", bom: true))
+check("add same", "\(doc.apply(.add(key: "ntn", value: "như thế nào")))", "unchanged")
+check("add taken", "\(doc.apply(.add(key: "dc", value: "đúng")))", "conflict(current: Optional(\"được\"))")
+doc = MacroDocument(data: bytes(base, bom: true))
+check("update", "\(doc.apply(.update(key: "k0", expected: "không", newKey: "k0", value: "Không")))", "applied")
+checkDoc("update", doc, bytes(header + "\r\n; comment\r\ndc:được\r\nk0:Không\r\nvs:với", bom: true))
+check("update stale", "\(doc.apply(.update(key: "k0", expected: "không", newKey: "k0", value: "ko")))",
+      "conflict(current: Optional(\"Không\"))")
+check("update forced", "\(doc.apply(.update(key: "k0", expected: "không", newKey: "k0", value: "ko"), force: true))",
+      "applied")
+check("update gone", "\(doc.apply(.update(key: "xx", expected: "a", newKey: "xx", value: "b")))", "conflict(current: nil)")
+check("rename taken", "\(doc.apply(.update(key: "dc", expected: "được", newKey: "vs", value: "x")))",
+      "invalid(\"Đã có phím tắt vs.\")")
+doc = MacroDocument(data: bytes(base, bom: true))
+check("remove last", "\(doc.apply(.remove(key: "vs", expected: "với")))", "applied")
+checkDoc("remove last", doc, bytes(header + "\r\n; comment\r\ndc:được\r\n  k0 :không", bom: true))
+check("remove gone", "\(doc.apply(.remove(key: "vs", expected: "với")))", "unchanged")
+check("remove stale", "\(doc.apply(.remove(key: "dc", expected: "đc")))", "conflict(current: Optional(\"được\"))")
+// Another machine added a line meanwhile: the edit is applied on top of it, nothing is lost.
+doc = MacroDocument(data: bytes(base + "\r\nmoi:mới", bom: true))
+_ = doc.apply(.update(key: "dc", expected: "được", newKey: "dc", value: "Được"))
+checkDoc("merge", doc, bytes(header + "\r\n; comment\r\ndc:Được\r\n  k0 :không\r\nvs:với\r\nmoi:mới", bom: true))
+// Renaming drops a second line for the old key, which would otherwise show up under it.
+doc = MacroDocument(data: bytes("a:1\nb:2\na:3\n"))
+_ = doc.apply(.update(key: "a", expected: "1", newKey: "c", value: "1"))
+checkDoc("rename duplicate", doc, bytes("c:1\nb:2\n"))
+doc = MacroDocument(data: utf16)
+_ = doc.apply(.add(key: "ko", value: "không"))
+var utf16Added = Data([0xFF, 0xFE])
+utf16Added.append("x;y\nvs:với\nko:không\n".data(using: .utf16LittleEndian)!)
+checkDoc("utf16 add", doc, utf16Added)
+doc = MacroDocument(data: Data())
+_ = doc.apply(.add(key: "a", value: "b"))
+checkDoc("empty add", doc, bytes("a:b\r\n"))
+checkDoc("new file", MacroDocument.newFile(), bytes(header, bom: true))
+doc = MacroDocument(data: Data([0x61, 0x3A, 0xE9]))  // "a:é" in Latin-1: not UTF-8
+check("latin1 readable", doc.value(for: "a"), "é")
+check("latin1 read-only", "\(doc.apply(.add(key: "b", value: "c")))",
+      "invalid(\"File không phải UTF-8 hay UTF-16, ViKey không sửa được.\")")
+check("bad key colon", MacroDocument.problem(key: "a:b", value: "x"), "Phím tắt không được có dấu hai chấm (:).")
+check("bad key space", MacroDocument.problem(key: "a b", value: "x"), "Phím tắt không được có dấu cách.")
+check("bad newline", MacroDocument.problem(key: "ab", value: "x\ny"), "Không được xuống dòng.")
+check("ok key", MacroDocument.problem(key: " ab ", value: "x"), nil)
+// NFD typed or pasted in: written as NFC, found again by its NFC form.
+doc = MacroDocument(data: Data())
+_ = doc.apply(.add(key: "đc", value: "đu\u{031B}o\u{031B}\u{0323}c"))
+check("nfc", doc.value(for: "đc").map { String($0.unicodeScalars.count) }, "4")  // đ ư ợ c
+
 // Every key in a real UniKey file must show up on screen unchanged when typed, in both methods,
 // or the key could never match. Mirrors KeyTap: letters (and VNI digits inside a word) go to the
 // engine; any other character closes the engine word but stays in the token.

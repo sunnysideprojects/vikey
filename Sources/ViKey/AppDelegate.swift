@@ -261,6 +261,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func wireSettingsWindow() {
         settingsState.chooseMacroFile = { [weak self] in self?.chooseMacroFile() }
+        settingsState.createMacroFile = { [weak self] in self?.createMacroFile() }
+        settingsState.saveMacro = { [weak self] edit, done in self?.saveMacro(edit, force: false, done: done) }
+        settingsState.showMacroBackups = {
+            try? FileManager.default.createDirectory(at: MacroFile.backupFolder, withIntermediateDirectories: true)
+            NSWorkspace.shared.open(MacroFile.backupFolder)
+        }
         settingsState.openMacroFile = { [weak self] in
             if let url = self?.macroFile.url { NSWorkspace.shared.open(url) }
         }
@@ -278,6 +284,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .loaded(let n): state.macroInfo = "\(n) mục"; state.macroFailed = false
         case .failed: state.macroInfo = "Không đọc được file"; state.macroFailed = true
         }
+        if state.macroEntries != macroFile.entries { state.macroEntries = macroFile.entries }
+        state.macroWritable = macroFile.isWritable
+        if case .loaded = macroFile.status { state.macroReadOnly = !macroFile.isWritable } else { state.macroReadOnly = false }
         state.loginEnabled = SMAppService.mainApp.status == .enabled
         state.syncFixApps(with: settings)
     }
@@ -344,6 +353,70 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         settings.macroEnabled = true
         settings.macroPath = url.path  // applySettings starts watching it
+    }
+
+    private func createMacroFile() {
+        let panel = NSSavePanel()
+        panel.title = "Tạo file gõ tắt"
+        panel.message = "Đặt file trong Google Drive hay iCloud nếu muốn dùng chung với UniKey trên máy khác."
+        panel.nameFieldStringValue = "ukmacro.txt"
+        panel.allowedContentTypes = [.plainText]
+        let cloud = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/CloudStorage")
+        if FileManager.default.fileExists(atPath: cloud.path) { panel.directoryURL = cloud }
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        // An existing file is used as it is, never replaced.
+        if !FileManager.default.fileExists(atPath: url.path) {
+            do { try MacroFile.create(at: url) } catch {
+                NSAlert(error: error).runModal()
+                return
+            }
+        }
+        settings.macroEnabled = true
+        settings.macroPath = url.path
+    }
+
+    /// Writes an edit from the settings window; on a conflict asks whether to write it anyway.
+    private func saveMacro(_ edit: MacroEdit, force: Bool, done: @escaping (String?) -> Void) {
+        macroFile.write(edit, force: force) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .saved: done(nil)
+            case let .invalid(message): done(message)
+            case let .failed(message): done("Không lưu được file: \(message)")
+            case let .conflict(current):
+                if self.confirmOverwrite(edit, current: current) {
+                    self.saveMacro(edit, force: true, done: done)
+                } else {
+                    done(nil)  // keep the file's version; the list already shows it
+                }
+            }
+        }
+    }
+
+    private func confirmOverwrite(_ edit: MacroEdit, current: String?) -> Bool {
+        let alert = NSAlert()
+        let now = current.map { "Trong file bây giờ là: “\($0)”." } ?? "Trong file bây giờ không còn phím tắt này."
+        switch edit {
+        case let .add(key, _):
+            alert.messageText = "Phím tắt “\(key)” đã có trong file"
+            alert.informativeText = now + " Thay bằng nội dung bạn vừa nhập?"
+            alert.addButton(withTitle: "Thay")
+            alert.addButton(withTitle: "Giữ như trong file")
+        case let .update(key, _, _, _):
+            alert.messageText = current == nil ? "Phím tắt “\(key)” vừa bị xoá ở nơi khác"
+                : "Phím tắt “\(key)” vừa được sửa ở nơi khác"
+            alert.informativeText = "Có thể từ UniKey hay ViKey trên máy khác. " + now + " Lưu bản của bạn?"
+            alert.addButton(withTitle: "Lưu bản của tôi")
+            alert.addButton(withTitle: "Giữ như trong file")
+        case let .remove(key, _):
+            alert.messageText = "Phím tắt “\(key)” vừa được sửa ở nơi khác"
+            alert.informativeText = "Có thể từ UniKey hay ViKey trên máy khác. " + now + " Vẫn xoá?"
+            alert.addButton(withTitle: "Xoá")
+            alert.addButton(withTitle: "Giữ lại")
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        return alert.runModal() == .alertFirstButtonReturn
     }
 
     @objc private func menuToggle() { toggle() }
