@@ -107,7 +107,7 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   `main`, MIT (font OFL, SSP logo all rights reserved; see LICENSE). `origin` uses the SSH host alias
   `github.com-personal` (personal key, account nhatnx); `gh` is logged in as nhatnx.
 - Never commit `ukmacro.txt` (the user's personal abbreviations, gitignored), `build/`, `dist/`.
-- Releases (latest v1.0.12, 2026-11-28): `scripts/release.sh X.Y.Z changes.md [--dry-run]`. changes.md is the
+- Releases (latest v1.0.13, 2026-11-28): `scripts/release.sh X.Y.Z changes.md [--dry-run]`. changes.md is the
   release-specific part of the notes in Vietnamese (one-line summary + `## Thay đổi` bullets); write it in the
   scratchpad, not the repo. The script checks (on main, clean, in sync with origin, tag free, version newer), bumps
   `CFBundleShortVersionString` and `CFBundleVersion` (+1), runs build.sh, zips to `dist/ViKey-X.Y.Z.zip`, writes
@@ -201,7 +201,7 @@ UniKey-style Vietnamese input method for macOS. Menu bar app (Swift, SwiftPM, ma
   ancestor (30 ms budget, cached until click/Return/Tab/Esc/arrow/⌘⌃⌥ combo/app switch; no answer = keep the
   U+202F trick). Not checked against Chrome's AX tree yet (Claude's shell has no Accessibility permission).
 - Abbreviations (gõ tắt) with the user's ukmacro.txt on Google Drive: user confirmed working 2026-11-24.
-- Built 2026-11-28 (not released): editing gõ tắt in Settings. Checked with a harness on a test copy in Google Drive
+- Shipped 2026-11-28 (v1.0.13): editing gõ tắt in Settings (user confirmed the list scrolls). Checked with a harness on a test copy in Google Drive
   (add/update/stale-update conflict/remove): same inode and Drive item ID, CRLF and no final newline kept, Drive
   reported it uploaded. Not checked: the cloud copy itself (the Drive connector is another account), the sheet UI
   by hand, UniKey on Windows reading the edited file. Macro expansion is off in ViKey's own windows (KeyTap checks
